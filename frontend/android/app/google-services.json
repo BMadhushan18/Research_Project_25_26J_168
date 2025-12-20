@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "794306530798",
+    "project_id": "material-estimate-research",
+    "storage_bucket": "material-estimate-research.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:794306530798:android:3ccb147b0fb004253052ff",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArUtfo29Ckjw31BSxzU_-ywz0ONzz-nUU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

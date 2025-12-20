@@ -1,0 +1,15 @@
+# Common Python requirements for the research project backend
+# Add specific requirements for each component in their subfolders
+
+Flask==2.3.2
+werkzeug==2.3.6
+requests==2.31.0
+
+# Image Processing & Computer Vision
+opencv-python==4.8.1.78
+opencv-contrib-python==4.8.1.78
+numpy>=1.24.4
+pillow>=10.2.0
+
+# Machine Learning
+torch
