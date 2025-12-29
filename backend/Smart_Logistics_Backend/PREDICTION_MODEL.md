@@ -1,8 +1,179 @@
-# Full Prediction Model Specification
-**Version:** 2025-12-29  
-**Maintainer:** Madhushan S.M.P.B – IT22172532  
-**Project ID:** 25-261-168  
-**Title:** Building Plan Analysis, Material Estimate & Waste Reduction
+# Updated Prediction Model & Calculation Documentation (December 2025)
+
+## Project & Model Overview
+The **Intelligent Multi-Modal Resource Logistics Optimizer** predicts vehicles, labor (by skill level: Unskilled, Semi-skilled, Skilled, Professional), drivers, fuel, hours, and cost for Sri Lankan construction projects. It uses:
+- NLP to parse BOQs (Excel) for quantities, rates, and tasks
+- ML/DL models trained on synthetic + parsed BOQ data
+- Material-driven pipeline: materials → tasks → vehicle/labor allocation → cost
+- Sri Lanka adjustments: monsoon delay (+20–30% time/fuel), urban congestion (+15% time), fuel price ~350 LKR/L, labor rates (daily): Unskilled 3,500–4,500, Semi-skilled 4,500–6,000, Skilled 5,500–8,500, Professional 10,000–25,000+
+
+Current trained models are overwritten during retraining. Use `./trained_models/` for artifacts.
+
+---
+
+## Where to Look in Code
+- Main prediction logic: `smart_logistics_backend/utils/prediction.py`
+- API endpoint: `smart_logistics_backend/app.py` → `/demo/predict`
+- Models: `smart_logistics_backend/models.py` (Pydantic)
+- BOQ NLP parser: `smart_logistics_backend/utils/extraction.py`
+- Training script: `smart_logistics_backend/train_models.py`
+- Constants: Move to `config.yaml` (recommended)
+
+---
+
+## High-Level Prediction Flow
+1. **User Input** (via POST /demo/predict):
+   - Simple: terrain, distance_km, material_tons, labor_type
+   - Detailed: materials list + wall spec + target_days + boq_file (optional)
+2. **If BOQ uploaded** → NLP parses → extracts quantities/tasks → augments features
+3. **Material-driven pipeline** (preferred):
+   - Normalize materials → compute total tons
+   - Map materials to tasks → estimate task hours
+   - Greedy vehicle allocation (capacities: Dump Truck 10t, Tipper 6m³, Trailer 40t)
+   - Labor allocation (skill-based)
+   - Calculate fuel/rental/driver costs
+4. **Fallback (simple input)** → heuristic → model.predict() → SL adjustments
+5. **Output**: Structured JSON with predictions, allocations, breakdowns
+
+---
+
+## User Inputs (DemoPredictionInput)
+```python
+class DemoPredictionInput(BaseModel):
+    terrain: str = "urban"                      # rough / flat / hilly / urban
+    distance_km: float = 10.0                   # haul distance
+    material_tons: float = None                 # fallback simple input
+    labor_type: str = "Skilled"                 # Unskilled / Semi-skilled / Skilled / Professional
+    materials: List[MaterialItem] = []          # detailed input
+    wall: WallSpec = None                       # optional for masonry/tiling
+    target_days: int = 30                       # desired project duration
+    boq_file: UploadFile = None                 # optional BOQ Excel/PDF
+```
+
+## System Outputs (DemoPredictionOutput)
+```json
+{
+  "predicted_fuel_liters": 285.0,
+  "predicted_labor_hours": 240.0,
+  "total_estimated_cost_LKR": 1525000,
+  "vehicle_allocation": [
+    {"vehicle_type": "Dump Truck (10-Ton)", "count": 3, "capacity_t": 10, "trips": 5},
+    {"vehicle_type": "Tipper Truck (6m³)", "count": 2, "capacity_t": 6, "trips": 8}
+  ],
+  "labor_allocations": [
+    {"skill_level": "Skilled", "category": "Masons", "count": 6, "daily_rate": 6500, "total_hours": 120, "total_cost": 780000},
+    {"skill_level": "Unskilled", "category": "General Laborers", "count": 10, "daily_rate": 4000, "total_hours": 200, "total_cost": 800000}
+  ],
+  "drivers": [
+    {"driver_type": "Dump Truck Driver", "count": 3, "daily_rate": 5500, "total_cost": 165000}
+  ],
+  "cost_breakdown": {
+    "labor_cost_total": 1580000,
+    "fuel_cost_total": 99750,
+    "rental_cost_total": 450000,
+    "driver_cost_total": 165000,
+    "other_costs": 50000,
+    "total_cost": 2343750,
+    "savings_potential": "18% if use Semi-skilled for tiling"
+  },
+  "confidence": 0.87,
+  "message": "Prediction based on BOQ parsing + ML/DL hybrid"
+}
+```
+
+---
+
+## Material → Task → Vehicle/Labor Mapping (Core Logic)
+### Material to Task Mapping (from BOQ parsing)
+- Cement → Concrete pouring
+- Bricks/Blocks → Masonry
+- Sand → Plastering / Concrete
+- Steel → Reinforcement fixing
+- Tiles → Tiling & flooring
+- Paint → Painting
+- Excavation volume → Earthwork
+
+### Task to Vehicle Mapping (used in compute_vehicle_allocation)
+```python
+TASK_VEHICLE_MAP = {
+    "Excavation & Earthwork": ["Excavator", "Bulldozer", "Dump Truck"],
+    "Concrete Works": ["Concrete Mixer Truck", "Concrete Pump"],
+    "Masonry & Blockwork": ["Tipper Truck", "Loader"],
+    "Formwork & Shuttering": ["Flatbed Truck"],
+    "Steel Reinforcement": ["Flatbed Truck"],
+    "Roofing": ["Flatbed Truck", "Mobile Crane"],
+    "Tiling & Flooring": ["Tipper Truck"],
+    "Plastering & Painting": ["Pickup Truck"],
+    "Plumbing & Electrical": ["Pickup Truck"],
+    "Metal Work": ["Pickup Truck"],
+    "Waste Removal": ["Dump Truck"]
+}
+```
+
+### Vehicle Details (fuel, rental, driver)
+```python
+VEHICLE_DETAILS = {
+    "Excavator (Mid-Size)": {"fuel_per_hour": 12, "rental_daily": 30000, "driver_daily": 6000},
+    "Dump Truck (10-Ton)": {"fuel_per_hour": 25, "rental_daily": 20000, "driver_daily": 5500},
+    "Tipper Truck (6m³)": {"fuel_per_hour": 20, "rental_daily": 18000, "driver_daily": 5000},
+    "Flatbed Truck": {"fuel_per_hour": 18, "rental_daily": 22000, "driver_daily": 6000},
+    "Concrete Mixer Truck": {"fuel_per_hour": 30, "rental_daily": 35000, "driver_daily": 6500},
+    "Mobile Crane": {"fuel_per_hour": 15, "rental_daily": 80000, "driver_daily": 9000}
+}
+```
+
+### Labor Skill Mapping to Tasks (allocate_labor function)
+```python
+LABOR_SKILL_MAP = {
+    "Excavation": ["Unskilled", "Skilled (Operator)"],
+    "Concrete": ["Skilled (Bar Bender)", "Semi-skilled", "Unskilled"],
+    "Masonry": ["Skilled (Mason)", "Semi-skilled", "Unskilled"],
+    "Plastering/Tiling": ["Skilled (Tiler/Mason)", "Semi-skilled"],
+    "Painting": ["Skilled (Painter)", "Semi-skilled"],
+    "Plumbing/Electrical": ["Skilled (Plumber/Electrician)", "Semi-skilled"],
+    "Metal Work": ["Skilled (Welder)"],
+    "Supervision": ["Professional (Foreman)"]
+}
+```
+
+### Sri Lanka Adjustments (in _apply_sl_adjustments)
+```python
+SL_ADJUSTMENTS = {
+    "urban": {"time_multiplier": 1.15, "cost_multiplier": 1.10},          # congestion
+    "rural": {"time_multiplier": 1.0, "cost_multiplier": 0.95},
+    "monsoon": {"time_multiplier": 1.30, "cost_multiplier": 1.20},         # rain delay
+    "dry": {"time_multiplier": 1.0, "cost_multiplier": 1.0},
+    "fuel_price_lkr": 350,
+    "labor_daily_rates": {
+        "Unskilled": 4000,
+        "Semi-skilled": 5500,
+        "Skilled": 7000,
+        "Professional": 15000
+    },
+    "driver_daily_rate": 5500
+}
+```
+
+### Fallback Heuristics (when model fails)
+```python
+FALLBACK_FORMULAS = {
+    "vehicles_needed": lambda f: (f.get("concrete_volume", 0) / 50) + (f.get("steel_quantity", 0) / 500) + 2,
+    "masons": lambda f: (f.get("concrete_volume", 0) / 20) + (f.get("site_area", 0) / 100) + 3,
+    "laborers": lambda f: (f.get("concrete_volume", 0) / 10) + (f.get("site_area", 0) / 50) + 5,
+    "fuel_liters": lambda f: (f.get("concrete_volume", 0) * 5) + (f.get("site_area", 0) * 0.5) + 100,
+    "estimated_hours": lambda f: (f.get("concrete_volume", 0) * 10) + (f.get("site_area", 0) * 2) + 200,
+    "estimated_cost": lambda f: (f.get("concrete_volume", 0) * 15000) + (f.get("steel_quantity", 0) * 200) + (f.get("site_area", 0) * 1000)
+}
+```
+
+### Developer Guidance
+- Always run NLP parser first if BOQ uploaded → extract quantities → feed into features.
+- Use task-to-vehicle map for allocation.
+- Update `SL_ADJUSTMENTS` with real-time fuel/labor rates.
+- Train with 500+ rows (use synthetic + parsed BOQ data).
+- Test endpoint with Postman using materials-based input.
+
+This updated prompt is now production-ready for your December 2025 submission.
 
 ## Purpose
 This subsystem predicts required vehicles, labor (Unskilled/Semi-skilled/Skilled/Professional), drivers, fuel consumption, estimated hours, and total cost (LKR) for Sri Lankan construction projects.  

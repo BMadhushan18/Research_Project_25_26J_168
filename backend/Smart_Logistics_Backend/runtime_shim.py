@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 from fastapi.responses import JSONResponse
 
-app = FastAPI(title="Smart Logistics API (shim)")
+app = FastAPI(title="Smart Logistics API (shim)", docs_url='/api/docs', redoc_url='/api/redoc')
 
 class LoginRequest(BaseModel):
     username: str
