@@ -1,1 +1,0 @@
-bricks - 97 bag\nsteel - 101 m3\nbricks - 130 bag\ngravel - 385 ton\nsand - 294 pcs\ngravel - 316 ton\n

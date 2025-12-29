@@ -1,1 +1,0 @@
-cement - 315 bag\nbricks - 173 ton\ngravel - 414 m3\nsand - 418 bag\n

@@ -1,1 +1,0 @@
-tiles - 210 pcs\nsand - 334 m3\ngravel - 63 kg\npaint - 225 pcs\npaint - 382 pcs\nsteel - 72 m3\n

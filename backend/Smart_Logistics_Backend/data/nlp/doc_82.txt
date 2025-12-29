@@ -1,1 +1,0 @@
-cement - 334 m3\npaint - 275 kg\ntiles - 434 kg\ncement - 71 m3\nbricks - 483 kg\nbricks - 119 pcs\n

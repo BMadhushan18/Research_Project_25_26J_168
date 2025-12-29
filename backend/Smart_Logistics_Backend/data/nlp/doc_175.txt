@@ -1,1 +1,0 @@
-paint - 369 bag\nbricks - 241 kg\ngravel - 103 m3\ngravel - 210 ton\ncement - 500 pcs\ngravel - 332 ton\nbricks - 313 bag\ntiles - 442 ton\ngravel - 131 kg\npaint - 403 m3\nbricks - 198 m3\ntiles - 483 m3\ncement - 120 m3\n

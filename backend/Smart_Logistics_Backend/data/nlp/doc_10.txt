@@ -1,1 +1,0 @@
-steel - 218 ton\nbricks - 330 bag\ncement - 350 m3\ncement - 219 m3\ngravel - 297 kg\npaint - 256 m3\nsteel - 45 ton\ncement - 16 pcs\ncement - 175 bag\nsand - 59 ton\nsand - 154 bag\n

@@ -1,1 +1,0 @@
-cement - 379 kg\nsand - 36 kg\ncement - 288 ton\nsand - 74 pcs\nsteel - 106 ton\nsand - 311 m3\npaint - 39 m3\ntiles - 322 bag\ngravel - 255 kg\ncement - 64 pcs\nsteel - 431 m3\ngravel - 95 m3\nbricks - 220 ton\npaint - 254 bag\npaint - 479 pcs\n

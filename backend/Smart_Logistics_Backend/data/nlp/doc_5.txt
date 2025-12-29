@@ -1,1 +1,0 @@
-bricks - 168 m3\ncement - 305 ton\nsand - 118 m3\nsand - 72 ton\nsand - 78 bag\ncement - 443 kg\nbricks - 173 bag\ncement - 413 ton\npaint - 347 m3\n

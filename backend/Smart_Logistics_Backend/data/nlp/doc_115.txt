@@ -1,1 +1,0 @@
-steel - 325 kg\nbricks - 283 pcs\ncement - 218 pcs\nsteel - 203 kg\nbricks - 167 bag\nbricks - 76 m3\nsteel - 197 bag\nbricks - 103 kg\ntiles - 97 m3\ncement - 251 pcs\nbricks - 345 pcs\ngravel - 250 pcs\n

@@ -1,1 +1,0 @@
-steel - 30 m3\ncement - 304 m3\npaint - 361 kg\nsand - 345 ton\ntiles - 361 m3\npaint - 321 pcs\ngravel - 452 m3\ncement - 148 ton\nbricks - 85 pcs\npaint - 20 pcs\ngravel - 340 pcs\n

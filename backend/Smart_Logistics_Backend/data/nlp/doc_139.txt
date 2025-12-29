@@ -1,1 +1,0 @@
-cement - 299 ton\nsteel - 439 m3\npaint - 160 ton\nbricks - 299 m3\nsand - 80 kg\n

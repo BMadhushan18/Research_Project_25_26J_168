@@ -1,1 +1,0 @@
-tiles - 327 kg\npaint - 270 ton\ngravel - 93 kg\ngravel - 210 ton\nsteel - 170 m3\n

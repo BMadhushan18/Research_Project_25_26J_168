@@ -1,1 +1,0 @@
-sand - 123 ton\nsteel - 332 kg\nsand - 192 m3\npaint - 131 kg\ncement - 161 kg\ncement - 351 kg\nsteel - 488 ton\nsteel - 206 kg\nsand - 476 bag\ngravel - 467 ton\ntiles - 456 pcs\ntiles - 20 bag\nsteel - 87 pcs\n

@@ -1,1 +1,0 @@
-gravel - 214 m3\npaint - 61 pcs\ngravel - 472 kg\npaint - 194 pcs\npaint - 310 kg\ntiles - 56 ton\nbricks - 357 pcs\ntiles - 388 m3\nsteel - 360 pcs\nsand - 88 kg\ncement - 234 kg\nsand - 360 ton\ntiles - 445 ton\n

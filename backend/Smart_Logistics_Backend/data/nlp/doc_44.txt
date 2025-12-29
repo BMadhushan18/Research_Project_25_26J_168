@@ -1,1 +1,0 @@
-cement - 297 ton\npaint - 351 bag\nsand - 423 pcs\nsteel - 260 ton\nbricks - 329 m3\nsteel - 455 kg\npaint - 88 m3\nsand - 490 m3\nsteel - 137 bag\nbricks - 148 m3\n

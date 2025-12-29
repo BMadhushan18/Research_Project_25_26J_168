@@ -1,1 +1,0 @@
-bricks - 57 bag\npaint - 23 m3\nbricks - 495 ton\ncement - 50 bag\n

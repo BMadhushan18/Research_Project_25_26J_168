@@ -1,1 +1,0 @@
-tiles - 307 kg\ntiles - 199 m3\ncement - 425 kg\ncement - 9 kg\ntiles - 76 kg\nsand - 91 kg\ngravel - 115 bag\n

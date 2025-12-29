@@ -1,1 +1,0 @@
-bricks - 114 ton\nsand - 291 kg\nsteel - 188 ton\nsand - 415 bag\nsteel - 208 ton\nsteel - 256 kg\nbricks - 337 kg\nsand - 361 bag\ncement - 385 m3\n

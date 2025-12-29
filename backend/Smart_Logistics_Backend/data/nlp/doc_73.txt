@@ -1,1 +1,0 @@
-tiles - 107 bag\npaint - 208 ton\npaint - 464 kg\npaint - 62 bag\nbricks - 298 ton\ntiles - 160 bag\ncement - 51 pcs\npaint - 297 pcs\nsand - 315 pcs\ncement - 23 ton\ngravel - 62 bag\n

@@ -1,1 +1,0 @@
-tiles - 405 m3\npaint - 414 m3\ncement - 437 pcs\nsteel - 494 pcs\ntiles - 258 kg\nsteel - 35 bag\nsteel - 419 kg\nsand - 201 ton\ngravel - 269 kg\nsand - 405 kg\npaint - 5 bag\ntiles - 84 ton\ncement - 66 ton\nsteel - 150 ton\n

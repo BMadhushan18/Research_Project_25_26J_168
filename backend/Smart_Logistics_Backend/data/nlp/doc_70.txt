@@ -1,1 +1,0 @@
-tiles - 485 bag\nsand - 283 ton\ntiles - 130 ton\nbricks - 424 kg\ntiles - 224 kg\npaint - 334 ton\nsteel - 352 kg\nbricks - 243 bag\npaint - 409 m3\nsand - 259 bag\n

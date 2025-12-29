@@ -1,1 +1,0 @@
-tiles - 412 ton\ntiles - 362 ton\nsand - 263 bag\nbricks - 28 ton\nsand - 478 pcs\ntiles - 23 pcs\nbricks - 494 bag\nsand - 14 bag\nsand - 127 m3\ngravel - 261 bag\n

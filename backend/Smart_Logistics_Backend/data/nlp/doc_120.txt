@@ -1,1 +1,0 @@
-tiles - 240 bag\ncement - 304 bag\ngravel - 187 kg\ntiles - 268 bag\nsteel - 454 ton\nsteel - 348 pcs\nsand - 133 kg\nsteel - 314 bag\nsand - 34 ton\ngravel - 164 ton\nbricks - 162 kg\nsand - 332 m3\npaint - 165 kg\ngravel - 167 kg\n

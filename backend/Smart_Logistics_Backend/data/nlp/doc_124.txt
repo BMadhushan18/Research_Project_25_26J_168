@@ -1,1 +1,0 @@
-tiles - 180 bag\nsteel - 7 m3\ncement - 54 bag\npaint - 273 m3\n
