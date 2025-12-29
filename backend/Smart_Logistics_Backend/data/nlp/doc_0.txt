@@ -1,0 +1,1 @@
+tiles - 167 ton\ncement - 213 m3\nsteel - 60 ton\npaint - 163 pcs\npaint - 164 m3\nsteel - 100 bag\nsteel - 420 pcs\ncement - 198 bag\ngravel - 473 bag\n

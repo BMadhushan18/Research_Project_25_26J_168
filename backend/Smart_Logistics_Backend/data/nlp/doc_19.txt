@@ -1,0 +1,1 @@
+tiles - 254 bag\ntiles - 47 bag\ncement - 143 bag\nbricks - 66 m3\nsteel - 355 kg\npaint - 379 ton\n

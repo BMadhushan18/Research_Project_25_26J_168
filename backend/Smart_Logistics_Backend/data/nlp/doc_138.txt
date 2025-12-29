@@ -1,0 +1,1 @@
+steel - 266 ton\nbricks - 468 ton\ntiles - 277 kg\ncement - 451 pcs\n

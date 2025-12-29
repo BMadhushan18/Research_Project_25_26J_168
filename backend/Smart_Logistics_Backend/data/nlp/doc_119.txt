@@ -1,0 +1,1 @@
+tiles - 91 kg\ntiles - 274 bag\ntiles - 345 m3\nbricks - 265 pcs\ngravel - 156 ton\nsand - 275 pcs\nbricks - 16 m3\ntiles - 442 bag\ncement - 303 bag\nsand - 120 kg\n

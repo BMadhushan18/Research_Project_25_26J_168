@@ -1,0 +1,1 @@
+steel - 77 bag\nbricks - 234 m3\ngravel - 362 kg\ntiles - 306 m3\nbricks - 305 m3\nsteel - 182 m3\ngravel - 211 pcs\nsteel - 234 m3\ngravel - 205 pcs\nsteel - 75 pcs\n

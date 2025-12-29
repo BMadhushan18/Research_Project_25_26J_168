@@ -1,0 +1,1 @@
+steel - 100 ton\nsteel - 41 ton\nsteel - 240 kg\npaint - 377 bag\ntiles - 158 pcs\nsand - 444 ton\ntiles - 94 ton\nsand - 133 bag\nsand - 279 m3\ntiles - 117 ton\nsteel - 10 kg\nbricks - 88 pcs\npaint - 335 ton\ncement - 170 m3\n

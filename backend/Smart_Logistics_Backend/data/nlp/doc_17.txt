@@ -1,0 +1,1 @@
+sand - 138 bag\nbricks - 102 kg\ncement - 12 m3\nsteel - 276 bag\npaint - 10 m3\npaint - 271 kg\ngravel - 166 ton\n

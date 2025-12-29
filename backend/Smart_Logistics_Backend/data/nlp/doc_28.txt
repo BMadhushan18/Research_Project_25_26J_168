@@ -1,0 +1,1 @@
+cement - 262 ton\nsteel - 50 ton\nbricks - 282 bag\npaint - 101 pcs\n

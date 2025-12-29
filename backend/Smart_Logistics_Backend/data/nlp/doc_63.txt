@@ -1,0 +1,1 @@
+tiles - 147 m3\ngravel - 424 pcs\ngravel - 390 pcs\nsand - 401 m3\npaint - 290 kg\nbricks - 18 m3\ngravel - 233 pcs\npaint - 490 ton\nsteel - 485 kg\npaint - 126 pcs\nsteel - 460 m3\ngravel - 272 pcs\npaint - 494 ton\nsand - 159 ton\nsteel - 258 m3\n

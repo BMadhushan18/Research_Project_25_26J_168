@@ -1,0 +1,1 @@
+bricks - 104 m3\nbricks - 134 m3\ntiles - 400 ton\nbricks - 86 m3\ntiles - 78 kg\ngravel - 143 pcs\npaint - 273 ton\ncement - 417 bag\nbricks - 201 bag\ncement - 100 m3\ntiles - 180 pcs\nbricks - 402 m3\nsand - 115 pcs\nsand - 405 m3\ngravel - 162 ton\n

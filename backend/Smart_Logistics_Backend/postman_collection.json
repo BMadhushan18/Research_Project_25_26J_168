@@ -1,0 +1,148 @@
+{
+  "info": {
+    "name": "Smart Logistics Backend",
+    "_postman_id": "smart-logistics-backend-collection",
+    "description": "Postman collection for Smart Logistics Backend API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\": \"alice\", \"password\": \"secret123\"}"
+        },
+        "url": "{{base_url}}/api/v1/login"
+      }
+    },
+    {
+      "name": "Demo: Health",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/demo/health"
+      }
+    },
+    {
+      "name": "Demo: Predict",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\"terrain\":\"urban\",\"material_tons\":5}" },
+        "url": "{{base_url}}/demo/predict"
+      }
+    },
+    {
+      "name": "Forecast",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": { "mode": "raw", "raw": "{\"material_demands\":{\"cement\":500}}" },
+        "url": "{{base_url}}/api/v1/forecast"
+      }
+    },
+    {
+      "name": "Upload Document",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "backend/Smart_Logistics_Backend/data/synthetic_boq.csv" },
+            { "key": "project_name", "value": "Demo Project", "type": "text" },
+            { "key": "location_type", "value": "urban", "type": "text" }
+          ]
+        },
+        "url": "{{base_url}}/api/v1/upload-document"
+      }
+    },
+    {
+      "name": "Upload BOQ (example)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "backend/Smart_Logistics_Backend/data/synthetic_boq.csv" },
+            { "key": "project_name", "value": "Synthetic BOQ Test", "type": "text" }
+          ]
+        },
+        "url": "{{base_url}}/api/v1/upload-document"
+      }
+    },
+    {
+      "name": "Demo: Predict from BOQ sample",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\"materials\":[{\"name\":\"cement\",\"qty\":1000,\"unit\":\"bag\"}],\"terrain\":\"urban\"}" },
+        "url": "{{base_url}}/demo/predict"
+      }
+    },
+    {
+      "name": "Optimize",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": { "mode": "raw", "raw": "{\"predictions\":{\"fuel_liters\":100},\"constraints\":{},\"optimization_goals\":[\"cost\"]}" },
+        "url": "{{base_url}}/api/v1/optimize"
+      }
+    },
+    {
+      "name": "Federated Update",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": { "mode": "raw", "raw": "{\"client_id\":\"client_1\",\"model_parameters\":{\"w\":[0.1,0.2]},\"num_samples\":100}" },
+        "url": "{{base_url}}/api/v1/federated-update"
+      }
+    },
+    {
+      "name": "List Projects",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": "{{base_url}}/api/v1/projects/{{user_id}}"
+      }
+    },
+    {
+      "name": "Statistics",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": "{{base_url}}/api/v1/statistics"
+      }
+    },
+    {
+      "name": "Admin: Reload Config",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "X-Admin-Token", "value": "{{admin_token}}" } ],
+        "url": "{{base_url}}/admin/reload-config"
+      }
+    }
+  ]
+}

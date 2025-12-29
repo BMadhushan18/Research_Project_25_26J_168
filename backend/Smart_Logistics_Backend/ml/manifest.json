@@ -1,0 +1,33 @@
+{
+  "model": "prediction_model_v1.pkl",
+  "framework": "scikit-learn",
+  "target_cols": [
+    "fuel_liters",
+    "labor_hours",
+    "total_cost",
+    "vehicle_count"
+  ],
+  "models": [
+    {
+      "name": "prediction_model_v1.pkl",
+      "type": "scikit-learn",
+      "path": "ml/prediction_model_v1.pkl",
+      "description": "Baseline multi-output regression model",
+      "version": "v1"
+    },
+    {
+      "name": "spacy_doc_extractor_v1",
+      "type": "spacy",
+      "path": "ml/spacy_doc_extractor_v1",
+      "description": "Rule-based spaCy extractor (EntityRuler)",
+      "version": "v1"
+    },
+    {
+      "name": "spacy_ner_v1",
+      "type": "spacy",
+      "path": "ml/spacy_ner_v1",
+      "description": "Trained spaCy NER model for BOQ entity extraction",
+      "version": "v1"
+    }
+  ]
+}

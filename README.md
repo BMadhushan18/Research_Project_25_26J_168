@@ -43,3 +43,23 @@ Platform permissions
 - iOS: Info.plist contains NSMicrophoneUsageDescription. You will be asked for microphone access on first use.
 
 To try it manually, run the app on a physical device or Android/iOS emulator and press the "Voice" button; speak into the microphone and you should see the text update in the square.
+
+---
+
+**Note:** The following project folders were moved into `backend/Smart_Logistics_Backend/` to keep backend assets together: `data/`, `DOCUMENTATION/`, `ml/`, `notebooks/`, `scripts/`, and `tests/`.
+
+If you have CI/workflows or scripts that reference their old locations, update paths to `backend/Smart_Logistics_Backend/` accordingly.
+
+---
+
+## Backend documentation & API examples 🔧
+
+The backend documentation and API examples are available in the repository:
+
+- `backend/Smart_Logistics_Backend/BACKEND_DOCUMENTATION.md` — Full A→Z backend documentation, endpoints, environment, and testing instructions.
+- `backend/Smart_Logistics_Backend/PREDICTION_MODEL.md` — Detailed prediction model spec, dataset headers, mappings and training results.
+- `backend/Smart_Logistics_Backend/EXAMPLES.md` — Per-endpoint cURL and Python snippets for quick testing.
+- `backend/Smart_Logistics_Backend/postman_collection.json` — Postman collection you can import into Postman.
+- `backend/Smart_Logistics_Backend/DOCUMENTATION/openapi.json` — OpenAPI (v3) specification generated from the documentation.
+
+Start the backend locally and view Swagger UI at `http://127.0.0.1:8000/api/docs`.

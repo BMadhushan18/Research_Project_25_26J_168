@@ -1,0 +1,1 @@
+tiles - 77 bag\ncement - 446 pcs\nbricks - 160 bag\nsand - 227 bag\ngravel - 118 m3\npaint - 494 m3\nsand - 106 kg\nsand - 318 ton\ncement - 132 ton\ncement - 28 pcs\ngravel - 180 bag\n

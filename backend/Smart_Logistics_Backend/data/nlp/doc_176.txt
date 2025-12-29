@@ -1,0 +1,1 @@
+steel - 368 kg\nsand - 1 ton\nbricks - 167 kg\ngravel - 330 bag\npaint - 42 kg\npaint - 475 m3\ntiles - 197 pcs\ntiles - 195 bag\nbricks - 328 ton\n

@@ -1,0 +1,1 @@
+tiles - 77 m3\nsand - 100 kg\npaint - 441 ton\n

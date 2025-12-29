@@ -1,0 +1,1 @@
+paint - 202 kg\nbricks - 289 ton\npaint - 257 pcs\nbricks - 150 pcs\nsteel - 298 m3\npaint - 240 kg\ngravel - 238 m3\ncement - 7 pcs\ntiles - 275 pcs\npaint - 295 m3\npaint - 137 kg\nbricks - 62 bag\nbricks - 183 kg\ngravel - 417 pcs\nsand - 426 kg\n

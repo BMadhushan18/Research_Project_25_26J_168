@@ -1,0 +1,1 @@
+gravel - 344 bag\ngravel - 17 kg\npaint - 430 ton\npaint - 255 kg\nbricks - 311 ton\nsteel - 494 m3\nsand - 23 m3\ncement - 15 m3\npaint - 86 bag\nsteel - 168 m3\ncement - 127 bag\nsteel - 381 bag\n
