@@ -94,6 +94,15 @@
       }
     },
     {
+      "name": "Demo: Predict (materials + BOQ example)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\"materials\":[{\"name\":\"cement\",\"qty\":1000,\"unit\":\"bag\"},{\"name\":\"sand\",\"qty\":300,\"unit\":\"kg\"}],\"terrain\":\"urban\"}" },
+        "url": "{{base_url}}/demo/predict"
+      }
+    },
+    {
       "name": "Demo: Predict from BOQ sample",
       "request": {
         "method": "POST",
