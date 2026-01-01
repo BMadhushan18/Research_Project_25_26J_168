@@ -1,0 +1,69 @@
+{
+  "materials": {
+    "cement": {
+      "machinery": ["Concrete Mixer", "Concrete Pump"],
+      "vehicles": ["Bulk Cement Truck"],
+      "labour": { "skilled": 2, "unskilled": 4 }
+    },
+    "sand": {
+      "machinery": ["Loader"],
+      "vehicles": ["Tipper Truck"],
+      "labour": { "skilled": 0, "unskilled": 3 }
+    },
+    "steel": {
+      "machinery": ["Crane"],
+      "vehicles": ["Flatbed Truck"],
+      "labour": { "skilled": 3, "unskilled": 2 }
+    },
+    "brick": {
+      "machinery": [],
+      "vehicles": ["Small Truck"],
+      "labour": { "skilled": 1, "unskilled": 6 }
+    },
+    "tile": {
+      "machinery": [],
+      "vehicles": ["Small Truck"],
+      "labour": { "skilled": 2, "unskilled": 2 }
+    },
+    "gravel": {
+      "machinery": ["Loader"],
+      "vehicles": ["Tipper Truck"],
+      "labour": { "skilled": 0, "unskilled": 3 }
+    },
+    "aggregate": {
+      "machinery": ["Loader"],
+      "vehicles": ["Tipper Truck"],
+      "labour": { "skilled": 0, "unskilled": 3 }
+    },
+    "wood": {
+      "machinery": ["Saw"],
+      "vehicles": ["Flatbed Truck"],
+      "labour": { "skilled": 2, "unskilled": 1 }
+    }
+  },
+  "role_types": {
+    "mason": "skilled",
+    "welder": "skilled",
+    "operator": "skilled",
+    "supervisor": "skilled",
+    "labourer": "unskilled",
+    "helper": "unskilled"
+  },
+  "quantity_heuristics": {
+    "concrete": {
+      "unit_threshold": "m3",
+      "mixer_per_unit": 50,
+      "pump_threshold": 100,
+      "labour_unskilled_per_unit": 20
+    },
+    "sand": {
+      "unit_threshold": "m3",
+      "labour_unskilled_per_unit": 20
+    },
+    "brick": {
+      "unit_threshold": "pcs",
+      "skilled_per_unit": 1000,
+      "unskilled_per_unit": 500
+    }
+  }
+}

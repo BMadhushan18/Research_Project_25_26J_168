@@ -1,46 +1,42 @@
 import os
+import json
+import logging
 import joblib
 from typing import Dict, Any
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 MODELS_DIR = os.path.join(DATA_DIR, '..', 'models')
 
-# Basic rule-based mapping: material->machinery, transport, labour
-RULES = {
-    'cement': {
-        'machinery': ['Concrete Mixer', 'Concrete Pump'],
-        'vehicles': ['Bulk Cement Truck'],
-        'labour': {'skilled': 2, 'unskilled': 4}
-    },
-    'sand': {
-        'machinery': ['Loader'],
-        'vehicles': ['Tipper Truck'],
-        'labour': {'skilled': 0, 'unskilled': 3}
-    },
-    'steel': {
-        'machinery': ['Crane'],
-        'vehicles': ['Flatbed Truck'],
-        'labour': {'skilled': 3, 'unskilled': 2}
-    },
-    'brick': {
-        'machinery': [],
-        'vehicles': ['Small Truck'],
-        'labour': {'skilled': 1, 'unskilled': 6}
-    },
-    'tile': {
-        'machinery': [],
-        'vehicles': ['Small Truck'],
-        'labour': {'skilled': 2, 'unskilled': 2}
-    }
-}
+# Load rules from config file
+def _load_rules():
+    """Load material rules from JSON config; fallback to empty dict if missing."""
+    rules_path = os.path.join(os.path.dirname(__file__), 'rules.json')
+    try:
+        with open(rules_path, 'r') as f:
+            config = json.load(f)
+            rules = config.get('materials', {})
+            logger.info(f'Loaded {len(rules)} materials from rules.json')
+            return rules
+    except FileNotFoundError:
+        logger.warning(f'rules.json not found at {rules_path}; using empty rules')
+        return {}
+    except json.JSONDecodeError as e:
+        logger.error(f'Failed to parse rules.json: {e}')
+        return {}
+
+RULES = _load_rules()
 
 class Predictor:
     def __init__(self):
         self.models = {}
+        self.model_loaded = False
         self._try_load_models()
 
     def _try_load_models(self):
-        # Attempt to load canonical model artifacts if present
+        """Attempt to load canonical model artifacts if present; log errors."""
         try:
             self.models['vectorizer'] = joblib.load(os.path.join(MODELS_DIR, 'vectorizer.joblib'))
             self.models['clf'] = joblib.load(os.path.join(MODELS_DIR, 'classifier.joblib'))
@@ -48,19 +44,24 @@ class Predictor:
             # Labour regressor (multi-output)
             try:
                 self.models['reg'] = joblib.load(os.path.join(MODELS_DIR, 'regressor_labour.joblib'))
-            except Exception:
+            except (FileNotFoundError, Exception) as e:
+                logger.warning(f'Labour regressor not found: {e}')
                 self.models['reg'] = None
             # Labour roles classifier and binarizer (optional)
             try:
                 self.models['clf_roles'] = joblib.load(os.path.join(MODELS_DIR, 'classifier_roles.joblib'))
                 self.models['mlb_roles'] = joblib.load(os.path.join(MODELS_DIR, 'mlb_roles.joblib'))
-            except Exception:
-                # roles artifacts may be absent
+            except (FileNotFoundError, Exception) as e:
+                logger.warning(f'Labour roles classifier not found: {e}')
                 self.models['clf_roles'] = None
                 self.models['mlb_roles'] = None
-        except Exception:
+            self.model_loaded = True
+            logger.info('Successfully loaded all ML models')
+        except (FileNotFoundError, Exception) as e:
             # No ML models available; we'll use rule-based fallback
+            logger.warning(f'ML models not available; using rule-based predictions: {e}')
             self.models = {}
+            self.model_loaded = False
 
     def _parse_material_string(self, text: str):
         """Parse strings like 'cement: ACC - 5 ton' or 'sand 10 m3' to extract name, quantity and unit."""
@@ -251,12 +252,6 @@ class Predictor:
             'labour': aggregated['labour'],
             'labour_roles': final_roles,
             'labour_role_types': final_role_types
-        }
-
-        return {
-            'machinery': sorted(list(aggregated['machinery'])),
-            'vehicles': sorted(list(aggregated['vehicles'])),
-            'labour': aggregated['labour']
         }
 
 if __name__ == '__main__':

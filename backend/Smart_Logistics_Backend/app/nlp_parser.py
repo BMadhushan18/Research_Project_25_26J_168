@@ -1,10 +1,14 @@
 import re
+import logging
 from typing import List, Dict
+
+logger = logging.getLogger(__name__)
 
 try:
     import spacy
     nlp = spacy.load("en_core_web_sm")
-except Exception:
+except Exception as e:
+    logger.warning(f'spaCy model not loaded; using regex fallback: {e}')
     nlp = None
 
 qty_unit_re = re.compile(r"(?P<qty>\d+(?:[\.,]\d+)?)\s*(?P<unit>m2|m3|m|kg|ltr|pcs|units|no\.|number|sq\.m|cubic\s*m|cu\.m|ton|tons)?", re.I)
