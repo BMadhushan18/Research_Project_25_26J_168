@@ -5,4 +5,4 @@ models/
 .vscode/.env
 data/uploads/
 *.joblib
-.pytest_cache/
+.pytest_cache/\n# Local environment\n.env\n
