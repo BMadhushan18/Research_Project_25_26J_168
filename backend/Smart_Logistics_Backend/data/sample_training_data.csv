@@ -1,0 +1,6 @@
+boq_text,machinery,vehicles,skilled,unskilled
+"Supply and lay 50 m3 concrete using ACC cement and local sand","Concrete Mixer;Concrete Pump","Bulk Cement Truck;Tipper Truck",2,4
+"Supply and lay 2000 bricks for wall","","Small Truck",1,6
+"Install 5 tons of steel rebar and columns","Crane","Flatbed Truck",3,2
+"Tile flooring 100 m2 using porcelain tiles","","Small Truck",2,2
+"Excavation 300 m3 and backfill","Excavator;Loader","Tipper Truck;Dump Truck",2,4
