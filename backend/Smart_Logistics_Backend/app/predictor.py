@@ -2,7 +2,17 @@ import os
 import json
 import logging
 import joblib
-from typing import Dict, Any
+from typing import Dict, Any, List
+
+from .labour_profiles import WORK_TYPE_LABOUR_PROFILES
+from .equipment_profiles import resolve_equipment_profile
+from .fuel_reference import (
+    FUEL_GRADE_REFERENCE,
+    KEY_FUEL_SUPPLIERS,
+    LIGHT_FUEL_GRADES,
+    OTHER_FUEL_TYPES,
+    EMERGING_FUELS,
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -103,9 +113,12 @@ class Predictor:
 
     def predict(self, parsed_boq: Dict[str, Any]) -> Dict[str, Any]:
         materials = parsed_boq.get('materials', [])
+        work_type = (parsed_boq.get('work_type') or '').lower()
         aggregated = {
             'machinery': set(),
             'vehicles': set(),
+            'machinery_counts': {},
+            'vehicle_counts': {},
             'labour': {'skilled': 0, 'unskilled': 0}
         }
 
@@ -124,8 +137,10 @@ class Predictor:
             # Rule-based lookup
             for kw, out in RULES.items():
                 if name and kw in name:
-                    aggregated['machinery'].update(out['machinery'])
-                    aggregated['vehicles'].update(out['vehicles'])
+                    for mach in out.get('machinery', []):
+                        _increment_equipment(aggregated['machinery'], aggregated['machinery_counts'], mach)
+                    for veh in out.get('vehicles', []):
+                        _increment_equipment(aggregated['vehicles'], aggregated['vehicle_counts'], veh)
                     aggregated['labour']['skilled'] += out['labour']['skilled']
                     aggregated['labour']['unskilled'] += out['labour']['unskilled']
 
@@ -137,10 +152,11 @@ class Predictor:
                         # mixers per 50 m3
                         import math
                         mixers = max(1, math.ceil(q / 50))
-                        aggregated['machinery'].add('Concrete Mixer')
+                        _increment_equipment(aggregated['machinery'], aggregated['machinery_counts'], 'Concrete Mixer', mixers)
                         if q > 100:
-                            aggregated['machinery'].add('Concrete Pump')
-                        aggregated['vehicles'].add('Bulk Cement Truck')
+                            _increment_equipment(aggregated['machinery'], aggregated['machinery_counts'], 'Concrete Pump', 1)
+                        truck_count = max(1, math.ceil(q / 40))
+                        _increment_equipment(aggregated['vehicles'], aggregated['vehicle_counts'], 'Bulk Cement Truck', truck_count)
                         # scale labour
                         aggregated['labour']['skilled'] += mixers
                         aggregated['labour']['unskilled'] += max(2, int(math.ceil(q / 20)))
@@ -149,29 +165,31 @@ class Predictor:
                         heuristic_roles.add('operator')
                     else:
                         # default fallback
-                        aggregated['machinery'].add('Concrete Mixer')
-                        aggregated['vehicles'].add('Bulk Cement Truck')
+                        _increment_equipment(aggregated['machinery'], aggregated['machinery_counts'], 'Concrete Mixer')
+                        _increment_equipment(aggregated['vehicles'], aggregated['vehicle_counts'], 'Bulk Cement Truck')
                         aggregated['labour']['skilled'] += 1
                         aggregated['labour']['unskilled'] += 2
                         heuristic_roles.add('mason')
 
                 if name and name in ('sand', 'aggregate'):
                     q = qty or 0
-                    aggregated['machinery'].add('Loader')
-                    aggregated['vehicles'].add('Tipper Truck')
+                    _increment_equipment(aggregated['machinery'], aggregated['machinery_counts'], 'Loader')
                     if unit and unit.lower() in ('m3', 'm'):
                         import math
+                        trips = max(1, int(math.ceil(q / 20)))
+                        _increment_equipment(aggregated['vehicles'], aggregated['vehicle_counts'], 'Tipper Truck', trips)
                         aggregated['labour']['skilled'] += 0
-                        aggregated['labour']['unskilled'] += max(1, int(math.ceil(q / 20)))
+                        aggregated['labour']['unskilled'] += max(1, trips)
                         heuristic_roles.add('operator')
                         heuristic_roles.add('labourer')
                     else:
+                        _increment_equipment(aggregated['vehicles'], aggregated['vehicle_counts'], 'Tipper Truck')
                         aggregated['labour']['unskilled'] += 2
                         heuristic_roles.add('labourer')
 
                 if name and name in ('brick', 'block'):
                     q = qty or 0
-                    aggregated['vehicles'].add('Small Truck')
+                    _increment_equipment(aggregated['vehicles'], aggregated['vehicle_counts'], 'Small Truck')
                     # labour scales with brick count
                     if q:
                         import math
@@ -185,13 +203,18 @@ class Predictor:
                         heuristic_roles.add('mason')
 
                 if name and name in ('tile',):
-                    aggregated['vehicles'].add('Small Truck')
+                    _increment_equipment(aggregated['vehicles'], aggregated['vehicle_counts'], 'Small Truck')
                     aggregated['labour']['skilled'] += 2
                     aggregated['labour']['unskilled'] += 2
                     heuristic_roles.add('labourer')
             except Exception:
                 # ignore heuristic failures
                 pass
+
+        for veh_hint in parsed_boq.get('vehicle_hints') or []:
+            _increment_equipment(aggregated['vehicles'], aggregated['vehicle_counts'], veh_hint)
+        for mach_hint in parsed_boq.get('machinery_hints') or []:
+            _increment_equipment(aggregated['machinery'], aggregated['machinery_counts'], mach_hint)
 
         # If ML models present, try to use them for more nuanced predictions
         if 'vectorizer' in self.models and 'clf' in self.models:
@@ -204,7 +227,8 @@ class Predictor:
                 try:
                     labels = self.models['mlb_mach'].classes_
                     selected = [labels[i] for i, v in enumerate(mach_pred[0]) if v == 1]
-                    aggregated['machinery'].update(selected)
+                    for label in selected:
+                        _increment_equipment(aggregated['machinery'], aggregated['machinery_counts'], label)
                 except Exception:
                     selected = []
 
@@ -243,16 +267,55 @@ class Predictor:
             'labourer': 'unskilled'
         }
 
-        combined_roles = set(heuristic_roles) | set(aggregated_roles)
+        profile_details: List[Dict[str, Any]] = []
+        profile_role_types: Dict[str, str] = {}
+        profile_roles: set[str] = set()
+        profile = WORK_TYPE_LABOUR_PROFILES.get(work_type)
+        if profile:
+            profile_details = profile.get('roles', [])
+            for role in profile_details:
+                slug = role.get('slug') or role.get('english')
+                if not slug:
+                    continue
+                profile_roles.add(slug)
+                profile_role_types[slug] = role.get('skill_level', 'unskilled')
+        profile_vehicle_details = profile.get('vehicles', []) if profile else []
+        profile_machinery_details = profile.get('machinery', []) if profile else []
+
+        for vehicle in profile_vehicle_details:
+            name = vehicle.get('name')
+            min_count = _extract_min_count(vehicle)
+            _ensure_equipment_minimum(aggregated['vehicles'], aggregated['vehicle_counts'], name, min_count)
+
+        for machine in profile_machinery_details:
+            name = machine.get('name')
+            min_count = _extract_min_count(machine)
+            _ensure_equipment_minimum(aggregated['machinery'], aggregated['machinery_counts'], name, min_count)
+
+        combined_roles = set(heuristic_roles) | set(aggregated_roles) | profile_roles
         final_roles = sorted(list(combined_roles))
-        final_role_types = {r: role_type_map.get(r, 'unskilled') for r in final_roles}
+        final_role_types = {}
+        for role in final_roles:
+            if role in profile_role_types:
+                final_role_types[role] = profile_role_types[role]
+            else:
+                final_role_types[role] = role_type_map.get(role, 'unskilled')
+
+        machinery_counts = {name: max(1, aggregated['machinery_counts'].get(name, 0)) for name in aggregated['machinery']}
+        vehicle_counts = {name: max(1, aggregated['vehicle_counts'].get(name, 0)) for name in aggregated['vehicles']}
+        fuel_plan = _build_fuel_plan(machinery_counts, vehicle_counts)
 
         return {
             'machinery': sorted(list(aggregated['machinery'])),
             'vehicles': sorted(list(aggregated['vehicles'])),
             'labour': aggregated['labour'],
             'labour_roles': final_roles,
-            'labour_role_types': final_role_types
+            'labour_role_types': final_role_types,
+            'labour_role_details': profile_details,
+            'vehicle_details': profile_vehicle_details,
+            'machinery_details': profile_machinery_details,
+            'fuel_plan': fuel_plan,
+            'work_type': work_type or None,
         }
 
 if __name__ == '__main__':
@@ -261,3 +324,80 @@ if __name__ == '__main__':
     s = "Supply and lay 50 m3 concrete (cement: 5 ton, sand: 1.5 m3) using ACC brand cement"
     parsed = {'materials': [{'raw': s, 'material': 'cement', 'quantity': 50, 'unit': 'm3', 'brands': ['ACC']}], 'raw_text': s}
     print(p.predict(parsed))
+
+
+def _increment_equipment(collection: set, counter: Dict[str, int], name: str, amount: int = 1) -> None:
+    if not name:
+        return
+    amount = max(1, int(amount or 1))
+    collection.add(name)
+    counter[name] = counter.get(name, 0) + amount
+
+
+def _ensure_equipment_minimum(collection: set, counter: Dict[str, int], name: str, minimum: int) -> None:
+    if not name:
+        return
+    minimum = max(1, int(minimum or 1))
+    collection.add(name)
+    current = counter.get(name, 0)
+    if current < minimum:
+        counter[name] = minimum
+
+
+def _extract_min_count(resource: Dict[str, Any]) -> int:
+    typical = resource.get('typical_count') or {}
+    minimum = typical.get('min') if isinstance(typical, dict) else None
+    if minimum is None:
+        return 1
+    try:
+        return max(1, int(minimum))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _build_fuel_plan(machinery_counts: Dict[str, int], vehicle_counts: Dict[str, int]) -> Dict[str, Any]:
+    plan = {
+        'machinery': [],
+        'vehicles': [],
+        'summary_by_fuel_type': {},
+        'total_liters': 0.0,
+        'fuel_grade_recommendations': {},
+        'light_fuels': LIGHT_FUEL_GRADES,
+        'other_fuels': OTHER_FUEL_TYPES,
+        'emerging_fuels': EMERGING_FUELS,
+        'key_suppliers': KEY_FUEL_SUPPLIERS,
+    }
+
+    def _add_entry(target: List[Dict[str, Any]], name: str, count: int) -> None:
+        profile = resolve_equipment_profile(name)
+        liters = float(profile.get('liters_per_shift') or 0)
+        total = round(liters * count, 2)
+        entry = {
+            'name': profile.get('name', name),
+            'count': count,
+            'fuel_type': profile.get('fuel_type', 'Diesel'),
+            'estimated_liters_per_unit': liters,
+            'estimated_total_liters': total,
+            'category': profile.get('category', 'machinery'),
+            'notes': profile.get('notes'),
+        }
+        target.append(entry)
+        plan['summary_by_fuel_type'].setdefault(entry['fuel_type'], 0.0)
+        plan['summary_by_fuel_type'][entry['fuel_type']] += total
+        plan['total_liters'] += total
+
+    for name in sorted(machinery_counts.keys()):
+        count = max(1, machinery_counts[name])
+        _add_entry(plan['machinery'], name, count)
+
+    for name in sorted(vehicle_counts.keys()):
+        count = max(1, vehicle_counts[name])
+        _add_entry(plan['vehicles'], name, count)
+
+    plan['total_liters'] = round(plan['total_liters'], 2)
+    for fuel_type, liters in list(plan['summary_by_fuel_type'].items()):
+        plan['summary_by_fuel_type'][fuel_type] = round(liters, 2)
+        if fuel_type in FUEL_GRADE_REFERENCE:
+            plan['fuel_grade_recommendations'][fuel_type] = FUEL_GRADE_REFERENCE[fuel_type]
+
+    return plan

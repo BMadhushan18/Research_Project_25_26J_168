@@ -1,6 +1,8 @@
 import re
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
+
+from .labour_profiles import WORK_TYPE_LABOUR_PROFILES
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,34 @@ MATERIAL_KEYWORDS = [
     "cement", "sand", "gravel", "aggregate", "steel", "rebar", "brick", "block", "concrete", "pch", "tile", "paint", "wood", "timber"
 ]
 
+VEHICLE_TOKEN_MAP = [
+    (re.compile(r"\btipper(s)?\b", re.I), "Tipper Truck"),
+    (re.compile(r"\bdump(er)? truck\b", re.I), "Dump Truck"),
+    (re.compile(r"\bconcrete mixer truck\b", re.I), "Concrete Mixer Truck"),
+    (re.compile(r"\bmixer truck\b", re.I), "Concrete Mixer Truck"),
+    (re.compile(r"\bpickup( truck)?\b", re.I), "Pickup Truck"),
+    (re.compile(r"\bpanel van\b", re.I), "Panel Van"),
+    (re.compile(r"\blow[-\s]?bed\b", re.I), "Low-bed Trailer"),
+    (re.compile(r"\bflatbed\b", re.I), "Large Truck"),
+    (re.compile(r"\bcrane truck\b", re.I), "Mobile Crane"),
+    (re.compile(r"\btractor\b", re.I), "Small Truck"),
+]
+
+MACHINERY_TOKEN_MAP = [
+    (re.compile(r"\bconcrete pump\b", re.I), "Concrete Pump"),
+    (re.compile(r"\bboom pump\b", re.I), "Concrete Pump"),
+    (re.compile(r"\bconcrete mixer\b", re.I), "Concrete Mixer"),
+    (re.compile(r"\btransit mixer\b", re.I), "Concrete Mixer Truck"),
+    (re.compile(r"\bexcavator\b", re.I), "Excavator"),
+    (re.compile(r"\bbulldozer\b", re.I), "Bulldozer"),
+    (re.compile(r"\bwheel loader\b", re.I), "Loader"),
+    (re.compile(r"\bloader\b", re.I), "Loader"),
+    (re.compile(r"\bscissor lift\b", re.I), "Scissor Lift"),
+    (re.compile(r"\bboom lift\b", re.I), "Boom Lift"),
+    (re.compile(r"\bjack hammer\b", re.I), "Jack Hammer"),
+    (re.compile(r"\bformwork\b", re.I), "Formwork System"),
+]
+
 BRAND_RE = re.compile(r"\b([A-Z][A-Za-z0-9\-]+)\b")
 
 
@@ -26,7 +56,10 @@ def parse_boq(boq_text: str) -> Dict:
     an annotated dataset + a trained NER model.
     """
     text = boq_text or ""
+    detected_work_type = _detect_work_type(text)
     materials = []
+    vehicle_hints = set()
+    machinery_hints = set()
 
     # Basic sentence-level processing with spaCy if available
     sents = [text]
@@ -50,6 +83,14 @@ def parse_boq(boq_text: str) -> Dict:
                 break
         # Try to detect brand tokens (heuristic: capitalized words)
         brands = BRAND_RE.findall(sent)
+        lowered = sent.lower()
+        for pattern, label in VEHICLE_TOKEN_MAP:
+            if pattern.search(lowered):
+                vehicle_hints.add(label)
+        for pattern, label in MACHINERY_TOKEN_MAP:
+            if pattern.search(lowered):
+                machinery_hints.add(label)
+
         if found or qty:
             materials.append({
                 'raw': sent.strip(),
@@ -63,4 +104,23 @@ def parse_boq(boq_text: str) -> Dict:
         tokens = re.findall(r"[A-Za-z0-9\-]+", text)
         materials = [{'raw': text, 'material': None, 'quantity': None, 'unit': None, 'brands': []}]
 
-    return {'materials': materials, 'raw_text': text}
+    return {
+        'materials': materials,
+        'raw_text': text,
+        'work_type': detected_work_type,
+        'vehicle_hints': sorted(vehicle_hints),
+        'machinery_hints': sorted(machinery_hints),
+    }
+
+
+def _detect_work_type(text: str) -> Optional[str]:
+    """Match the BOQ narrative against curated work-type keywords."""
+    lowered = (text or '').lower()
+    for work_type, profile in WORK_TYPE_LABOUR_PROFILES.items():
+        for keyword in profile.get('keywords', []):
+            if keyword.lower() in lowered:
+                return work_type
+        for token in profile.get('fallback_tokens', []):
+            if token and token.lower() in lowered:
+                return work_type
+    return None

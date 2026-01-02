@@ -163,3 +163,7 @@ if __name__ == '__main__':
         joblib.dump(reg, os.path.join(args.out, 'regressor_labour.joblib'))
 
         print('Saved final-trained artifacts to', args.out)
+    else:
+        # Default path: load full dataset and train standard models
+        df = load_df(args.data)
+        fit_and_save(df, args.out)

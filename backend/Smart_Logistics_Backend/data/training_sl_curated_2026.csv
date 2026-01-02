@@ -1,0 +1,33 @@
+boq_text,machinery,vehicles,skilled,unskilled,labour_roles
+"SL 2026: Supply OPC cement for foundation M25, 50 m3 with pump",Concrete Mixer;Concrete Pump,Concrete Mixer Truck;Tipper Truck,6,10,Mason_skilled;BarBender_skilled;Operator_skilled;Labourer_unskilled
+"SL 2026: River sand plastering 30 m3 coastal site",Loader,Tipper Truck,3,8,Mason_skilled;Helper_unskilled;Operator_skilled
+"SL 2026: Clay brick wall 230mm two-storey house 12000 bricks",Mixer;Scaffolding,Small Truck,5,12,Mason_skilled;Carpenter_skilled;Helper_unskilled
+"SL 2026: TMT reinforcement Grade 500 16-25mm for columns 5 ton",Bar Bender;Mobile Crane,Flatbed Truck,7,6,BarBender_skilled;SteelFixer_skilled;Operator_skilled;Helper_unskilled
+"SL 2026: Ready-mix concrete slab M30 with pump 120 m3 high-rise",Concrete Mixer;Concrete Pump;Vibrator,Concrete Mixer Truck,8,10,Mason_skilled;Operator_skilled;Foreman_skilled;Helper_unskilled
+"SL 2026: Porcelain floor tiling 600x600 living areas 350 m2",Tile Cutter,Pickup Truck,4,4,Tiler_skilled;Helper_unskilled
+"SL 2026: Emulsion paint external walls 3 coats 1200 m2",Airless Sprayer,Pickup Truck,3,3,Painter_skilled;Helper_unskilled
+"SL 2026: UPVC sliding windows installation 45 units",Drill;Scaffolding,Pickup Truck,4,3,Carpenter_skilled;Glazier_skilled;Helper_unskilled
+"SL 2026: PVC plumbing rough-in 32-75mm 12 floors",Pipe Threader,Pickup Truck,3,4,Plumber_skilled;Helper_unskilled
+"SL 2026: Electrical wiring apartment tower with DBs and conduits",Power Tools,Pickup Truck,5,4,Electrician_skilled;Helper_unskilled;Supervisor_skilled
+"SL 2026: Roofing colorbond sheets 0.47mm over trusses 1800 m2",Boom Lift,Truck,6,6,Carpenter_skilled;Roofer_skilled;Operator_skilled;Helper_unskilled
+"SL 2026: Timber formwork for beams and slab soffit 900 m2",Formwork System;Vibrator,Truck,6,10,Carpenter_skilled;Mason_skilled;Helper_unskilled
+"SL 2026: Scaffolding erection and dismantling double height atrium",Scaffolding,Truck,4,6,Scaffolder_skilled;Helper_unskilled;Supervisor_skilled
+"SL 2026: Bathroom waterproofing membrane 18 wet areas",Roller,Pickup Truck,3,2,Mason_skilled;Painter_skilled;Helper_unskilled
+"SL 2026: Bulk excavation for basement 800 m3 mixed soil",Excavator;Bulldozer,Dump Truck;Tipper Truck,6,8,Operator_skilled;Surveyor_skilled;Helper_unskilled
+"SL 2026: ABC base compaction for driveway 1200 m2",Vibratory Roller;Plate Compactor,Water Bowser,3,5,Operator_skilled;Labourer_unskilled
+"SL 2026: Rebar bending welding fabrication yard 12 ton",Bar Bender;Welding Machine,Flatbed Truck,5,4,Welder_skilled;BarBender_skilled;Helper_unskilled
+"SL 2026: Tower crane lifting aluminium formwork panels 20 floors",Tower Crane,Low-bed Trailer,4,3,CraneOperator_skilled;Rigger_skilled;Helper_unskilled
+"SL 2026: Concrete pump placing 8th floor night pour 60 m3",Concrete Pump;Concrete Mixer,Concrete Mixer Truck,5,6,PumpOperator_skilled;Mason_skilled;Helper_unskilled
+"SL 2026: Jack hammer demolition of RCC slab 40 m2",Jack Hammer,Pickup Truck,3,4,Demolition_skilled;Helper_unskilled
+"SL 2026: Haul river sand with tippers for slab casting 90 m3",Loader,Dump Truck;Tipper Truck,2,6,Driver_skilled;Helper_unskilled
+"SL 2026: Deliver reinforcement steel bundles to site",Mobile Crane,Flatbed Truck,3,3,Driver_skilled;Rigger_skilled;Helper_unskilled
+"SL 2026: Ready-mix delivery via mixer truck for core walls",Concrete Mixer Truck,Concrete Mixer Truck,3,2,Driver_skilled;PumpOperator_skilled;Helper_unskilled
+"SL 2026: Site logistics and supervision using pickup truck",,Pickup Truck,1,1,Driver_skilled;Helper_unskilled
+"SL 2026: Heavy lift mobile crane 50t for precast beams",Mobile Crane,Mobile Crane,4,4,CraneOperator_skilled;Rigger_skilled;Signalman_skilled;Helper_unskilled
+"SL 2026: Wheel loader stockpiling ABC and aggregates",Wheel Loader,Wheel Loader,2,3,Operator_skilled;Helper_unskilled
+"SL 2026: Vibratory roller compaction for road base",Vibratory Roller,Vibratory Roller,2,2,Operator_skilled;Helper_unskilled
+"SL 2026: Dump truck debris haulage from demolition",Excavator,Dump Truck,2,5,Driver_skilled;Helper_unskilled
+"SL 2026: General labour support for blockwork and cleanup",,,1,8,Labourer_unskilled;Mason_skilled
+"SL 2026: Skilled mason and bar bender for footing starter bars",Bar Bender,Pickup Truck,4,3,Mason_skilled;BarBender_skilled;Helper_unskilled
+"SL 2026: Electrical second fix switches sockets and testing",Power Tools,Pickup Truck,4,3,Electrician_skilled;Tester_skilled;Helper_unskilled
+"SL 2026: Plumbing testing and commissioning rooftop tanks",Water Pump,Pickup Truck,3,3,Plumber_skilled;Helper_unskilled
