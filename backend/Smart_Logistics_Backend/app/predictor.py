@@ -8,7 +8,8 @@ from typing import Dict, Any
 logger = logging.getLogger(__name__)
 
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-MODELS_DIR = os.path.join(DATA_DIR, '..', 'models')
+# Models live in backend/Smart_Logistics_Backend/models
+MODELS_DIR = os.path.join(DATA_DIR, 'models')
 
 # Load rules from config file
 def _load_rules():

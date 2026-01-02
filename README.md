@@ -10,29 +10,40 @@ A Flutter project for the research project with multiple components.
   - `wood_identification/`
   - `progress_tracking_and_cost_estimate/`
   - `machine_management/`
-- `frontend/`: Flutter frontend
-  - `lib/`: Main library
-    - `auth/`: Authentication related code
-    - `utils/`: Utility functions
-    - `widgets/`: Common widgets
-    - `building_plan_analysis/`: Building plan analysis component
-    - `material_estimate/`: Material estimate component (moved from old project)
-    - `wood_identification/`: Wood identification component
-    - `progress_tracking_and_cost_estimate/`: Progress tracking and cost estimate component
-    - `machine_management/`: Machine management component
+- `Smart_Logistics_Frontend/`: Flutter frontend tailored for the FastAPI backend
+  - `lib/core`: Theme, shared widgets, models, and the API client
+  - `lib/features`: Feature slices (dashboard, prediction, training, health)
+  - `lib/navigation`: `AppShell` with a custom navigation bar that fans out the four primary screens
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### Backend (FastAPI)
 
-A few resources to get you started if this is your first Flutter project:
+1. `cd backend/Smart_Logistics_Backend`
+2. Install deps: `pip install -r requirements.txt`
+3. Run tests (optional but recommended): `pytest`
+4. Launch the API: `uvicorn app.main:app --host 0.0.0.0 --port 8001`
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+The backend exposes `/predict`, `/train`, `/train/{job_id}`, and `/db/health`. MongoDB is optional; predictions/train jobs will fall back to in-memory tracking when the database is offline.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Frontend (Flutter)
+
+1. `cd Smart_Logistics_Frontend`
+2. Fetch packages: `flutter pub get`
+3. Run the UI: `flutter run -d <device>`
+
+The Flutter shell boots into a "Smart Logistics" dashboard. Open the **Command** tab (first tab) to confirm or edit the backend URL. Defaults:
+
+- Android emulator → `http://10.0.2.2:8001`
+- iOS simulator / desktop / web → `http://localhost:8001`
+
+Use the remaining tabs to:
+
+- **Predict** – paste BOQ text, add manual materials, and visualize machinery, vehicles, and labour demand. Results note whether the ML or the rule engine was used.
+- **Train** – pick a CSV (`boq_text, machinery, vehicles, skilled, unskilled, labour_roles`) and submit synchronous or background training jobs.
+- **Health** – ping `/db/health`, view the resolved base URL, and follow the built-in incident checklist.
+
+All requests flow through `lib/core/services/api_client.dart`, which stores the chosen base URL in `SharedPreferences`.
 
 ## Speech-to-Text (Voice button)
 

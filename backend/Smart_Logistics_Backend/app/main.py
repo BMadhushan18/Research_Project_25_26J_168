@@ -1,8 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, validator
 from app.predictor import Predictor
 from app.nlp_parser import parse_boq
 from app.train_manager import start_background_job, get_job
+from app.file_ingest import ingest_boq_upload, MissingDependencyError
 import os
 import logging
 import aiofiles
@@ -12,6 +14,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Smart Logistics Backend")
+
+# Enable CORS for local frontend development (adjust origins for production)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 predictor = Predictor()
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
@@ -31,33 +41,12 @@ class PredictRequest(BaseModel):
             raise ValueError('boq_text exceeds maximum length of 10,000 characters')
         return v.strip()
 
-@app.post("/predict")
-async def predict(req: PredictRequest):
-    """Predict machinery, vehicles, and labour requirements from BOQ text.
-    
-    Returns:
-        {
-            "parsed": {...},
-            "prediction": {
-                "machinery": [...],
-                "vehicles": [...],
-                "labour": {"skilled": int, "unskilled": int},
-                "labour_roles": [...],
-                "labour_role_types": {...},
-                "model_used": "ml" | "rules"
-            }
-        }
-    """
+def _run_prediction(parsed: dict):
+    """Shared prediction + logging flow for text and file inputs."""
     try:
-        parsed = parse_boq(req.boq_text)
-        # Allow user to override parsed materials if provided
-        if req.materials:
-            parsed['materials'] = req.materials
         result = predictor.predict(parsed)
-        # Add indicator of which model was used
         result['model_used'] = 'ml' if predictor.model_loaded else 'rules'
 
-        # Log prediction to MongoDB if available
         try:
             from app.db import get_db
             db = get_db()
@@ -69,7 +58,7 @@ async def predict(req: PredictRequest):
                     'prediction': result,
                     'model_used': result['model_used']
                 })
-        except Exception as e:
+        except Exception as e:  # pragma: no cover - optional logging only
             logger.warning(f'Failed to log prediction to MongoDB: {e}')
 
         logger.info(f'Prediction completed using {result["model_used"]} model')
@@ -77,6 +66,36 @@ async def predict(req: PredictRequest):
     except Exception as e:
         logger.error(f'Prediction failed: {e}')
         raise HTTPException(status_code=500, detail=f'Prediction failed: {str(e)}')
+
+
+@app.post("/predict")
+async def predict(req: PredictRequest):
+    """Predict machinery, vehicles, and labour requirements from BOQ text."""
+    parsed = parse_boq(req.boq_text)
+    if req.materials:
+        parsed['materials'] = req.materials
+    return _run_prediction(parsed)
+
+
+@app.post('/predict/file')
+async def predict_file(file: UploadFile = File(...)):
+    """Predict from an uploaded BOQ file (pdf, excel, word, csv, txt)."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail='Filename is required')
+    try:
+        ingest = ingest_boq_upload(file)
+    except MissingDependencyError as dep_err:
+        raise HTTPException(status_code=400, detail=str(dep_err))
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as e:
+        logger.error(f'Failed to ingest file: {e}')
+        raise HTTPException(status_code=500, detail='Failed to read the uploaded file')
+
+    parsed = parse_boq(ingest.raw_text)
+    if ingest.materials:
+        parsed['materials'] = ingest.materials
+    return _run_prediction(parsed)
 
 
 @app.post('/train')

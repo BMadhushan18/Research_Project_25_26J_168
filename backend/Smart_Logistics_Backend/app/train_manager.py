@@ -30,7 +30,7 @@ def _runner(job_id: str, file_path: str, out_dir: str):
     """Background task runner for training jobs."""
     db = get_db()
     try:
-        if db:
+        if db is not None:
             db.jobs.update_one({"job_id": job_id}, {"$set": {"status": "running", "started_at": datetime.utcnow()}}, upsert=True)
         else:
             JOBS[job_id] = {"status": "running"}
@@ -40,7 +40,7 @@ def _runner(job_id: str, file_path: str, out_dir: str):
 
         # Record completion and basic model metadata
         metadata = {"artifacts": os.listdir(out_dir), "completed_at": datetime.utcnow()}
-        if db:
+        if db is not None:
             db.jobs.update_one({"job_id": job_id}, {"$set": {"status": "completed", "metadata": metadata}}, upsert=True)
             db.models.insert_one({"job_id": job_id, "metadata": metadata, "created_at": datetime.utcnow()})
             logger.info(f'Training job {job_id} completed; metadata logged to MongoDB')
@@ -59,7 +59,7 @@ def start_background_job(file_path: str, out_dir: str = MODELS_DIR, bg_tasks: Ba
     """Create and start a training job (async or inline)."""
     job_id = uuid4().hex
     db = get_db()
-    if db:
+    if db is not None:
         db.jobs.insert_one({"job_id": job_id, "status": "queued", "file_path": file_path, "created_at": datetime.utcnow()})
         logger.info(f'Job {job_id} queued in MongoDB')
     else:
@@ -78,7 +78,7 @@ def start_background_job(file_path: str, out_dir: str = MODELS_DIR, bg_tasks: Ba
 def get_job(job_id: str):
     """Retrieve job status and metadata."""
     db = get_db()
-    if db:
+    if db is not None:
         doc = db.jobs.find_one({"job_id": job_id}, {'_id': 0})
         return doc or {"status": "unknown"}
     return JOBS.get(job_id, {"status": "unknown"})
