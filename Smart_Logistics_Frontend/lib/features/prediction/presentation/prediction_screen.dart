@@ -48,8 +48,27 @@ class _PredictionScreenState extends State<PredictionScreen> {
         });
       }
     } catch (e) {
+      final String message = e is ApiException ? e.message : e.toString();
       if (mounted) {
-        setState(() => _errorMessage = 'Error: ${e.toString()}');
+        setState(() => _errorMessage = 'Error: $message\nTip: For physical Android devices, run "adb reverse tcp:8001 tcp:8001" or tap settings to configure the backend URL (use your PC IP or 10.0.2.2).');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Request failed: $message'),
+            action: SnackBarAction(
+              label: 'Use 10.0.2.2',
+              onPressed: () async {
+                final apiClient = Provider.of<ApiClient>(context, listen: false);
+                try {
+                  await apiClient.updateBaseUrl('http://10.0.2.2:8001');
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Set base URL to 10.0.2.2:8001 — re-try')));
+                  _submitPrediction();
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to set URL: ${e.toString()}')));
+                }
+              },
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -87,8 +106,26 @@ class _PredictionScreenState extends State<PredictionScreen> {
         });
       }
     } catch (e) {
+      final String message = e is ApiException ? e.message : e.toString();
       if (mounted) {
-        setState(() => _errorMessage = 'File upload failed: ${e.toString()}');
+        setState(() => _errorMessage = 'File upload failed: $message');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: $message'),
+            action: SnackBarAction(
+              label: 'Use 10.0.2.2',
+              onPressed: () async {
+                final apiClient = Provider.of<ApiClient>(context, listen: false);
+                try {
+                  await apiClient.updateBaseUrl('http://10.0.2.2:8001');
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Set base URL to 10.0.2.2:8001 — try again')));
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to set URL: ${e.toString()}')));
+                }
+              },
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -108,6 +145,13 @@ class _PredictionScreenState extends State<PredictionScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Backend settings',
+            onPressed: _showBaseUrlDialog,
+          ),
+        ],
       ),
       body: _prediction != null
           ? _buildPredictionReport(context, colorScheme)
@@ -550,6 +594,61 @@ class _PredictionScreenState extends State<PredictionScreen> {
               .toList(),
         ],
       ],
+    );
+  }
+
+  /// Show dialog to view/update backend Base URL
+  Future<void> _showBaseUrlDialog() async {
+    final apiClient = Provider.of<ApiClient>(context, listen: false);
+    if (!apiClient.isReady) {
+      try {
+        await apiClient.hydrate();
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    final controller = TextEditingController(text: apiClient.isReady ? apiClient.baseUrl : '');
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Backend Base URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Base URL',
+                hintText: 'e.g. http://192.168.1.10:8001',
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text('Tip: For physical Android devices you can run "adb reverse tcp:8001 tcp:8001" then use http://10.0.2.2:8001', style: TextStyle(fontSize: 12)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              final value = controller.text.trim();
+              try {
+                await apiClient.updateBaseUrl(value);
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Base URL updated')));
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update: ${e.toString()}')));
+                }
+              }
+            },
+            child: const Text('Save'),
+          )
+        ],
+      ),
     );
   }
 }
