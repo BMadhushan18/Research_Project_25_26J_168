@@ -363,7 +363,15 @@ class _PredictionScreenState extends State<PredictionScreen> {
               _buildSectionHeader(context, Icons.construction, 'Machinery'),
               const SizedBox(height: 8),
               ...pred.machinery.map((m) => _buildItemChip(context, m)),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+
+              // Detailed machinery info
+              if (pred.machineryDetails.isNotEmpty) ...[
+                Text('Machinery Details', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ...pred.machineryDetails.map((d) => _buildMachineryDetailCard(context, d)),
+                const SizedBox(height: 20),
+              ],
             ],
 
             /// Vehicles section
@@ -371,7 +379,15 @@ class _PredictionScreenState extends State<PredictionScreen> {
               _buildSectionHeader(context, Icons.local_shipping, 'Vehicles'),
               const SizedBox(height: 8),
               ...pred.vehicles.map((v) => _buildItemChip(context, v)),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+
+              // Detailed vehicle info
+              if (pred.vehicleDetails.isNotEmpty) ...[
+                Text('Vehicle Details', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ...pred.vehicleDetails.map((d) => _buildVehicleDetailCard(context, d)),
+                const SizedBox(height: 20),
+              ],
             ],
 
             /// Labour section
@@ -383,7 +399,15 @@ class _PredictionScreenState extends State<PredictionScreen> {
               pred.labourSkilled,
               pred.labourUnskilled,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+
+            // Labour role details
+            if (pred.labourRoleDetails.isNotEmpty) ...[
+              Text('Labour Role Details', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              ...pred.labourRoleDetails.map((r) => _buildLabourRoleCard(context, r)),
+              const SizedBox(height: 20),
+            ],
 
             /// Fuel plan section
             if (pred.fuelPlan != null) ...[
@@ -594,6 +618,83 @@ class _PredictionScreenState extends State<PredictionScreen> {
               .toList(),
         ],
       ],
+    );
+  }
+
+  Widget _buildMachineryDetailCard(BuildContext context, MachineryDetail d) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(d.name, style: Theme.of(context).textTheme.titleMedium)),
+                Text(d.category, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (d.usage.isNotEmpty) Text('Usage: ${d.usage}'),
+            const SizedBox(height: 4),
+            Text('Fuel per shift: ${d.fuelLitersPerShift.toStringAsFixed(0)} L'),
+            const SizedBox(height: 4),
+            Text('Typical count: ${d.typicalCountMin} - ${d.typicalCountMax}'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleDetailCard(BuildContext context, VehicleDetail d) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(d.name, style: Theme.of(context).textTheme.titleMedium)),
+                Text(d.category, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (d.usage.isNotEmpty) Text('Usage: ${d.usage}'),
+            const SizedBox(height: 4),
+            Text('Fuel per shift: ${d.fuelLitersPerShift.toStringAsFixed(0)} L'),
+            const SizedBox(height: 4),
+            Text('Typical count: ${d.typicalCountMin} - ${d.typicalCountMax}'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabourRoleCard(BuildContext context, LabourRoleDetail r) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(r.english, style: Theme.of(context).textTheme.titleMedium)),
+                Text(r.skillLevel, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (r.sinhala.isNotEmpty) Text('Sinhala: ${r.sinhala}'),
+            const SizedBox(height: 4),
+            Text('Daily rate: LKR ${r.dailyRateMin.toStringAsFixed(0)} - ${r.dailyRateMax.toStringAsFixed(0)}'),
+            const SizedBox(height: 4),
+            Text('Typical count: ${r.typicalCountMin} - ${r.typicalCountMax}'),
+            const SizedBox(height: 8),
+            if (r.responsibilities.isNotEmpty) Text('Responsibilities: ${r.responsibilities}'),
+          ],
+        ),
+      ),
     );
   }
 
