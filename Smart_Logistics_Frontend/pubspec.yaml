@@ -90,6 +90,18 @@ dependencies:
   
   # Intl for date formatting
   intl: ^0.19.0
+  
+  # File picker for BOQ uploads
+  file_picker: ^8.1.2
+  
+  # Lottie animations
+  lottie: ^3.1.2
+  
+  # Connectivity checking
+  connectivity_plus: ^6.0.3
+  
+  # Local notifications
+  flutter_local_notifications: ^17.1.0
 
 dev_dependencies:
   flutter_test:
