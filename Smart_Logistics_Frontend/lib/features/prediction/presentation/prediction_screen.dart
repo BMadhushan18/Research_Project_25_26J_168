@@ -18,9 +18,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
   bool _isLoading = false;
   PredictionResponse? _prediction;
   String? _errorMessage;
-
-  // File upload state
-  XFile? _selectedFile;
   String? _selectedFileName;
 
   @override
@@ -61,50 +58,42 @@ class _PredictionScreenState extends State<PredictionScreen> {
     }
   }
 
-  /// Pick a local BOQ file and store selection
-  Future<void> _pickFile() async {
-    setState(() => _errorMessage = null);
-    try {
-      final XFile? file = await openFile(
-        acceptedTypeGroups: [
-          XTypeGroup(label: 'BOQ', extensions: ['txt', 'csv', 'pdf']),
-        ],
-      );
-      if (file == null) return;
-      if (mounted) {
-        setState(() {
-          _selectedFile = file;
-          _selectedFileName = file.name;
-        });
-      }
-    } catch (e) {
-      if (mounted)
-        setState(() => _errorMessage = 'File pick failed: ${e.toString()}');
-    }
-  }
-
-  /// Submit selected file to backend for prediction
-  Future<void> _submitFilePrediction() async {
-    if (_selectedFile == null) {
-      setState(() => _errorMessage = 'No file selected');
-      return;
-    }
-
+  /// Pick a file (csv, excel, pdf, docx, txt) and submit to the backend for analysis
+  Future<void> _pickFileAndUpload() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _selectedFileName = null;
     });
 
     try {
       final apiClient = Provider.of<ApiClient>(context, listen: false);
-      final response = await apiClient.predictFromFile(_selectedFile!);
+
+      final XTypeGroup types = XTypeGroup(
+        label: 'BOQ Files',
+        extensions: ['csv', 'xls', 'xlsx', 'pdf', 'doc', 'docx', 'txt'],
+      );
+
+      final XFile? file = await openFile(acceptedTypeGroups: [types]);
+      if (file == null) return; // user cancelled
+
+      setState(() => _selectedFileName = file.name);
+
+      final response = await apiClient.predictFromFile(file);
+
       if (mounted) {
-        setState(() => _prediction = response);
+        setState(() {
+          _prediction = response;
+        });
       }
     } catch (e) {
-      if (mounted) setState(() => _errorMessage = 'Error: ${e.toString()}');
+      if (mounted) {
+        setState(() => _errorMessage = 'File upload failed: ${e.toString()}');
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -192,54 +181,46 @@ class _PredictionScreenState extends State<PredictionScreen> {
             _buildPresetButtons(context, colorScheme),
             const SizedBox(height: 16),
 
-            /// File upload
+            /// File upload card
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(
-                      'Upload BOQ File',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _selectedFileName ?? 'No file selected',
-                            overflow: TextOverflow.ellipsis,
+                    Icon(Icons.upload_file, color: colorScheme.primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Upload BOQ File',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          icon: const Icon(Icons.attach_file),
-                          label: const Text('Choose File'),
-                          onPressed: _isLoading ? null : _pickFile,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.upload_file),
-                        label: Text(
-                          _isLoading ? 'Analyzing...' : 'Analyze File',
-                        ),
-                        onPressed: (_selectedFile == null || _isLoading)
-                            ? null
-                            : _submitFilePrediction,
+                          const SizedBox(height: 4),
+                          Text(
+                            'Supported: .csv, .xls, .xlsx, .pdf, .doc, .docx, .txt',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          if (_selectedFileName != null) ...[
+                            const SizedBox(height: 8),
+                            Text('Selected: $_selectedFileName', style: Theme.of(context).textTheme.bodySmall),
+                          ],
+                        ],
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.attach_file),
+                      label: const Text('Choose & Analyze'),
+                      onPressed: _isLoading ? null : _pickFileAndUpload,
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+
+            const SizedBox(height: 16),
 
             /// Submit button
             SizedBox(
