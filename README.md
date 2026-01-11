@@ -3,6 +3,7 @@
 A Flutter project for the research project with multiple components.
 
 ## Project Structure
+![Screenshot](A.dia.jpeg)
 
 - `backend/`: Backend code for all components
   - `building_plan_analysis/`
