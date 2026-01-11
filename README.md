@@ -61,7 +61,7 @@ Continuous user feedback for model improvement and usability enhancements
 - `backend/`: Backend code for all components
   - `building_plan_analysis/`
   - `material_estimate/`
-  - `wood_identification/`
+  - `material_recomendation_and_wood_identification/`
   - `progress_tracking_and_cost_estimate/`
   - `machine_management/`
 - `frontend/`: Flutter frontend
@@ -70,8 +70,9 @@ Continuous user feedback for model improvement and usability enhancements
     - `utils/`: Utility functions
     - `widgets/`: Common widgets
     - `building_plan_analysis/`: Building plan analysis component
-    - `material_estimate/`: Material estimate component (moved from old project)
+    - `material_estimate/`: Material estimate component
     - `wood_identification/`: Wood identification component
+    - `material_recomendation/`: material recomendation component
     - `progress_tracking_and_cost_estimate/`: Progress tracking and cost estimate component
     - `machine_management/`: Machine management component
 
