@@ -13,76 +13,49 @@ By automating material selection, cost and duration estimation, BOQ analysis, an
 
 Project Dependencies
 
-The successful development and operation of the system depend on the following technical, data, and operational components:
-
 1. Software and Technology Dependencies
 
 Frontend Technologies
-
 Flutter (for cross-platform mobile application)
-
 Web UI frameworks for dashboards and visualization
-
 Backend Technologies
-
 Python-based backend (Flask / FastAPI)
-
 RESTful APIs for frontend–backend communication
-
 Machine Learning & AI Libraries
-
 Scikit-learn (ML models for prediction and recommendation)
-
 TensorFlow / PyTorch (Deep Learning and Computer Vision models)
-
 OpenCV (image processing and wood surface detection)
-
 NLP Tools
-
 PDF/Excel/Word parsers for BOQ document analysis
-
 NLP libraries for text extraction and classification
 
 2. Data Dependencies
 
 Construction material datasets (wood, paint, skim coat prices and attributes)
-
 Historical construction cost and duration data
-
 BOQ samples and construction drawings
-
 Labeled wood surface and quality images for model training
-
 Logistics and resource usage data (labor, vehicles, machinery)
 
 3. Infrastructure Dependencies
 
 Cloud or on-premise servers for model hosting and API services
-
 Storage systems for datasets, images, and generated reports
-
 GPU/accelerated computing resources for training DL models
-
 Secure database systems (MySQL / PostgreSQL / NoSQL)
 
 4. Integration Dependencies
 
 Integration between mobile app and backend ML services
-
 Model versioning and deployment pipelines
-
 PDF report generation and download services
-
 Optional AR/3D visualization components for future extensions
 
 5. User and Operational Dependencies
 
 User input accuracy (budgets, measurements, images, BOQ files)
-
 Internet connectivity for real-time predictions (with limited offline support)
-
 Domain expertise for dataset validation and system tuning
-
 Continuous user feedback for model improvement and usability enhancements
 
 - `backend/`: Backend code for all components
@@ -102,38 +75,9 @@ Continuous user feedback for model improvement and usability enhancements
     - `progress_tracking_and_cost_estimate/`: Progress tracking and cost estimate component
     - `machine_management/`: Machine management component
 
-## Getting Started
 
-This project is a starting point for a Flutter application.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-
-## Speech-to-Text (Voice button)
-
-The home screen contains a "Voice" button. When pressed, it will start listening using the platform's speech recognition and display the recognized text in the square container on the home screen in real-time.
-
-Platform permissions
-- Android: The app requests RECORD_AUDIO permission. Ensure the permission is allowed in Settings or runtime permission dialog when prompted.
-- iOS: Info.plist contains NSMicrophoneUsageDescription. You will be asked for microphone access on first use.
-
-To try it manually, run the app on a physical device or Android/iOS emulator and press the "Voice" button; speak into the microphone and you should see the text update in the square.
-
----
-
-**Note:** The following project folders were moved into `backend/Smart_Logistics_Backend/` to keep backend assets together: `data/`, `DOCUMENTATION/`, `ml/`, `notebooks/`, `scripts/`, and `tests/`.
-
-If you have CI/workflows or scripts that reference their old locations, update paths to `backend/Smart_Logistics_Backend/` accordingly.
-
----
-
-## Backend documentation & API examples 🔧
+## Backend documentation & API examples 
 
 The backend documentation and API examples are available in the repository:
 
