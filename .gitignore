@@ -94,3 +94,4 @@ web/.last_build_id
 .Trashes
 ehthumbs.db
 Thumbs.db
+backend/*.pkl
