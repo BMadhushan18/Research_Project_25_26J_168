@@ -1,0 +1,63 @@
+name: smart_construction
+description: Smart Construction Management System
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.1
+
+  # HTTP Client
+  dio: ^5.4.0
+  http: ^1.1.0
+  http_parser: ^4.0.2
+
+  # Image Processing
+  image: ^4.1.4
+
+  # File Handling
+  path_provider: ^2.1.2
+  path: ^1.8.3
+  file_picker: ^10.3.0
+
+  # Sharing
+  share_plus: ^12.0.0
+
+  # Permissions
+  permission_handler: ^12.0.0
+
+  # UI Components
+  flutter_spinkit: ^5.2.0
+  percent_indicator: ^4.2.3
+
+  # Storage
+  shared_preferences: ^2.2.2
+
+  # Image Picker
+  image_picker: ^1.0.7
+
+  # UUID
+  uuid: ^4.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/models/
+    - AppImages/
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
