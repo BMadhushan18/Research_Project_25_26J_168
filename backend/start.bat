@@ -1,0 +1,6 @@
+@echo off
+echo Installing dependencies...
+pip install -r requirements.txt
+echo.
+echo Starting Smart Construction MongoDB Backend on port 8090...
+python app.py

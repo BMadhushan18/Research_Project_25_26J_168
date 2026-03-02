@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "400718368817",
+    "firebase_url": "https://smartconstructionmanagementapp-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "smartconstructionmanagementapp",
+    "storage_bucket": "smartconstructionmanagementapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400718368817:android:b6e2a9a6dd24a27a900510",
+        "android_client_info": {
+          "package_name": "com.yourcompany.scanner_3d"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLRCRC4dbkL9IaD623t7mAehcDPo1aorg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,3 +1,4 @@
+
 # Python
 __pycache__/
 *.py[cod]
@@ -94,3 +95,70 @@ web/.last_build_id
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# --------------------------
+# Backend (Python)
+# --------------------------
+backend/.venv/
+backend/__pycache__/
+backend/**/*.pyc
+backend/**/*.py[cod]
+backend/dist/
+backend/build/
+backend/.env
+
+# --------------------------
+# Flutter App & Frontend
+# --------------------------
+
+# Core Flutter/Dart (applies to both)
+flutterApp/build/
+flutterApp/.dart_tool/
+flutterApp/.flutter-plugins
+flutterApp/.flutter-plugins-dependencies
+flutterApp/.packages
+flutterApp/pubspec.lock
+
+frontend/build/
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/pubspec.lock
+
+# Android specific
+flutterApp/android/.gradle/
+flutterApp/android/local.properties
+flutterApp/android/key.properties
+flutterApp/android/app/build/
+
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/key.properties
+frontend/android/app/build/
+
+# iOS specific
+flutterApp/ios/Pods/
+flutterApp/ios/.symlinks/
+flutterApp/ios/Flutter/Flutter.framework/
+flutterApp/ios/**/*.xcuserdata/
+
+frontend/ios/Pods/
+frontend/ios/.symlinks/
+frontend/ios/Flutter/Flutter.framework/
+frontend/ios/**/*.xcuserdata/
+
+# Windows specific
+flutterApp/windows/**/generated_plugin_registrant.*
+frontend/windows/**/generated_plugin_registrant.*
+
+# --------------------------
+# Editor / OS junk
+# --------------------------
+.vscode/
+.idea/
+.DS_Store
+**/.DS_Store
+*.log
+*.tmp
+
