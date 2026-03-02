@@ -1,0 +1,114 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/mongo_project_provider.dart';
+import '../../utils/constants.dart';
+import 'create_project_screen.dart';
+import 'tabs/overview_tab.dart';
+import 'tabs/materials_tab.dart';
+import 'tabs/workers_tab.dart';
+import 'tabs/boq_tab.dart';
+import 'tabs/purchasing_tab.dart';
+import 'tabs/progress_tab.dart';
+import 'tabs/safety_tab.dart';
+
+class ProjectDetailScreen extends StatefulWidget {
+  const ProjectDetailScreen({super.key});
+
+  @override
+  State<ProjectDetailScreen> createState() => _ProjectDetailScreenState();
+}
+
+class _ProjectDetailScreenState extends State<ProjectDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabs;
+
+  final _tabItems = const [
+    _TabItem(Icons.dashboard_outlined, 'Overview'),
+    _TabItem(Icons.inventory_2_outlined, 'Materials'),
+    _TabItem(Icons.people_outline, 'Workers'),
+    _TabItem(Icons.format_list_numbered, 'BOQ'),
+    _TabItem(Icons.shopping_cart_outlined, 'Purchasing'),
+    _TabItem(Icons.bar_chart_outlined, 'Progress'),
+    _TabItem(Icons.health_and_safety_outlined, 'Safety'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: _tabItems.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pp = context.watch<ProjectProvider>();
+    final project = pp.currentProject;
+    final name = project?.projectName ?? 'Project';
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text(name,
+            style: const TextStyle(
+                fontSize: 17, fontWeight: FontWeight.w600)),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit Project',
+            onPressed: project == null
+                ? null
+                : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              CreateProjectScreen(existing: project)),
+                    ),
+          ),
+        ],
+        bottom: TabBar(
+          controller: _tabs,
+          isScrollable: true,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          tabAlignment: TabAlignment.start,
+          tabs: _tabItems
+              .map((t) => Tab(
+                    icon: Icon(t.icon, size: 18, color: Colors.white),
+                    text: t.label,
+                    iconMargin: const EdgeInsets.only(bottom: 2),
+                  ))
+              .toList(),
+        ),
+      ),
+      body: pp.loading
+          ? const Center(child: CircularProgressIndicator())
+          : TabBarView(
+              controller: _tabs,
+              children: const [
+                OverviewTab(),
+                MaterialsTab(),
+                WorkersTab(),
+                BOQTab(),
+                PurchasingTab(),
+                ProgressTab(),
+                SafetyTab(),
+              ],
+            ),
+    );
+  }
+}
+
+class _TabItem {
+  final IconData icon;
+  final String label;
+  const _TabItem(this.icon, this.label);
+}
