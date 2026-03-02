@@ -94,4 +94,11 @@ web/.last_build_id
 .Trashes
 ehthumbs.db
 Thumbs.db
-backend/*.pkl
+Dineth_backend/*.pkl
+
+# ML models
+*.pkl
+*.joblib
+*.pt
+*.h5
+Dineth_backend/models/
