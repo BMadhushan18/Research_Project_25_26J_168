@@ -63,3 +63,9 @@ frontend/windows/**/generated_plugin_registrant.*
 **/.DS_Store
 *.log
 *.tmp
+
+## ML Models
+Dineth_backend/*.pkl
+*.pt
+*.h5
+*.joblib
