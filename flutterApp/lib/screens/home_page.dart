@@ -11,6 +11,7 @@ import 'machine_management_screen.dart';
 import 'create_project_flow.dart';
 import 'projects/projects_screen.dart';
 import 'build_project_screen.dart';
+import 'settings_gemini.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -64,8 +65,7 @@ class _HomePageState extends State<HomePage>
   }
 
   void _logout() {
-    Navigator.pushAndRemoveUntil(
-      context,
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
       (route) => false,
     );
@@ -87,7 +87,6 @@ class _HomePageState extends State<HomePage>
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
-      extendBody: true,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -813,7 +812,7 @@ class _HomePageState extends State<HomePage>
                   title: 'Settings',
                   onTap: () {
                     Navigator.pop(context);
-                    _showNotImplemented();
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
                   },
                 ),
                 _buildDrawerItem(

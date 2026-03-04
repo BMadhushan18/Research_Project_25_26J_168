@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/mongo_api_service.dart';
 import '../utils/constants.dart';
-import 'projects/projects_screen.dart';
+import 'upload_building_plan_screen.dart';
 
 class CreateProjectFlow extends StatefulWidget {
   const CreateProjectFlow({super.key});
@@ -33,7 +33,7 @@ class _CreateProjectFlowState extends State<CreateProjectFlow> {
     try {
       final api = MongoApiService();
       await api.loadToken();
-      await api.createProject({
+      final result = await api.createProject({
         'projectName': _nameController.text.trim(),
         'location':
             '${_cityController.text.trim()}, ${_districtController.text.trim()}, ${_provinceController.text.trim()}',
@@ -42,15 +42,42 @@ class _CreateProjectFlowState extends State<CreateProjectFlow> {
         'city': _cityController.text.trim(),
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Project created successfully'),
-          backgroundColor: Colors.green,
+      final projectId = result['_id'] as String? ?? '';
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 28),
+              SizedBox(width: 8),
+              Text('Project Created!'),
+            ],
+          ),
+          content: const Text(
+            'Your project has been created successfully.\n\n'
+            'Would you like to upload building plan images so Gemini can generate a Bill of Quantities?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Skip'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Upload Plans'),
+            ),
+          ],
         ),
       );
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ProjectsScreen()),
+        MaterialPageRoute(
+          builder: (_) => UploadBuildingPlanScreen(projectId: projectId),
+        ),
       );
     } catch (e) {
       if (!mounted) return;

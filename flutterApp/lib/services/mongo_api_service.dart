@@ -138,6 +138,13 @@ class MongoApiService {
 
   Future<void> deleteProject(String pid) => delete('/projects/$pid');
 
+  Future<Map<String, dynamic>> postBuildingStructure(
+          String pid, Map<String, dynamic> structureData) =>
+      post('/buildingstructure/$pid', structureData);
+
+  Future<Map<String, dynamic>> getBuildingStructure(String pid) =>
+      get('/buildingstructure/$pid');
+
   // ─── Subcollection endpoints ───────────────────────────────────────────────
   Future<List<dynamic>> getSub(String pid, String sub) =>
       getList('/projects/$pid/$sub');
@@ -150,4 +157,42 @@ class MongoApiService {
 
   Future<void> deleteSub(String pid, String sub, String docId) =>
       delete('/projects/$pid/$sub/$docId');
+
+  // ─── ThreeJS endpoints ─────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> getThreeJs(String pid) => get('/threejs/$pid');
+
+  Future<String?> getThreeJsCategory(String pid, String category) async {
+    final res = await get('/threejs/$pid/$category');
+    return res['html_code'] as String?;
+  }
+
+  Future<void> setThreeJsCategory(String pid, String category, String htmlCode) =>
+      post('/threejs/$pid/$category', {'html_code': htmlCode});
+
+  // ─── Materials library ─────────────────────────────────────────────────────
+
+  /// All materials sorted by name. Returns List of {_id, name, brands, sizes}.
+  Future<List<dynamic>> getAllMaterials() => getList('/materials');
+
+  /// Create a material. Returns the created doc.
+  Future<Map<String, dynamic>> createMaterial(
+      String name, List<String> brands, List<String> sizes) =>
+      post('/materials', {'name': name, 'brands': brands, 'sizes': sizes});
+
+  /// Update brands/sizes (and optionally name) for a material by id.
+  Future<Map<String, dynamic>> updateMaterial(
+      String id, {String? name, List<String>? brands, List<String>? sizes}) {
+    final body = <String, dynamic>{};
+    if (name   != null) body['name']   = name;
+    if (brands != null) body['brands'] = brands;
+    if (sizes  != null) body['sizes']  = sizes;
+    return put('/materials/$id', body);
+  }
+
+  /// Delete a material by id.
+  Future<void> deleteMaterial(String id) => delete('/materials/$id');
+
+  /// Brands + sizes for a material name (used by _MatRow select buttons).
+  Future<Map<String, dynamic>> getMaterialOptions(String materialName) =>
+      get('/materials/options/${Uri.encodeComponent(materialName)}');
 }
