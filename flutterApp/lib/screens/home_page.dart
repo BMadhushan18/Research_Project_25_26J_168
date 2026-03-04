@@ -8,6 +8,7 @@ import 'material_estimate_screen.dart';
 import 'wood_detection_screen.dart';
 import 'cost_estimation_screen.dart';
 import 'machine_management_screen.dart';
+import 'time_estimation/time_estimate_screen.dart';
 import 'create_project_flow.dart';
 import 'projects/projects_screen.dart';
 import 'build_project_screen.dart';
@@ -440,6 +441,18 @@ class _HomePageState extends State<HomePage>
             context,
             MaterialPageRoute(
                 builder: (context) => const MaterialEstimateScreen()),
+          ),
+        ),
+        _buildFeatureCard(
+          icon: Icons.calculate_rounded,
+          title: 'Time Estimate',
+          description: 'DurationAnalysis',
+          color: AppColors.success,
+          backgroundImage: 'AppImages/material_estimate.png',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const TimeEstimateScreen()),
           ),
         ),
       ],
