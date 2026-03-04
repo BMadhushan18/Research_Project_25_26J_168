@@ -2,20 +2,6 @@ import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
 import 'phase_result.dart';
 
-/// ---------------------------------------------------------------------------
-/// RoofDurationScreen
-/// - Fields:
-///   1) Roof Area (m²)
-///   2) Roof Height (m)
-///   3) Roof Type (dropdown): Gable, Flat, Lean-to, Hip
-///   4) Roof Covering Type (dropdown): Concrete Tiles, Clay Tiles, RC Slab,
-///                                    Asbestos Sheets, Metal Sheets
-///   5) Labor Count (counter)
-/// - On Calculate:
-///   -> estimate duration days
-///   -> return result to PhaseWiseDurationScreen via Navigator.pop(result)
-/// ---------------------------------------------------------------------------
-
 class RoofDurationScreen extends StatefulWidget {
   final int initialLabors;
 
