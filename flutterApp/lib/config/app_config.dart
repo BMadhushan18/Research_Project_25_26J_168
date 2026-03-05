@@ -7,7 +7,7 @@ class AppConfig {
   static const bool kUseMongo = true;
 
   /// PC's local WiFi IP — Android device must be on the same network.
-  static const String backendHost = '192.168.8.103';
+  static const String backendHost = '192.168.1.28';
   static const int    backendPort = 8090;
 
   static String get baseUrl => 'http://$backendHost:$backendPort';
