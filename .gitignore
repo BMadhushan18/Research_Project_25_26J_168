@@ -2,6 +2,8 @@
 # Backend (Python)
 # --------------------------
 backend/.venv/
+backend/IT22196460_Backend/venv/
+backend/IT22196460_Backend/source/
 backend/__pycache__/
 backend/**/*.pyc
 backend/**/*.py[cod]
@@ -66,6 +68,7 @@ frontend/windows/**/generated_plugin_registrant.*
 
 ## ML Models
 Dineth_backend/*.pkl
+backend/IT22196460_Backend/ml_models/labor_prediction_model.pkl
 *.pt
 *.h5
 *.joblib
