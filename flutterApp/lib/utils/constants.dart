@@ -1,3 +1,4 @@
+import '../config/app_config.dart' as backend_config;
 import 'package:flutter/material.dart';
 
 class AppColors {
@@ -36,8 +37,8 @@ class AppColors {
 }
 
 class AppConfig {
-  // Backend API URL - Change this to your server IP
-  static const String apiBaseUrl = 'http://192.168.0.101:8000';
+  // Keep legacy consumers pointed at the same backend config as auth/services.
+  static String get apiBaseUrl => backend_config.AppConfig.baseUrl;
 
   // Minimum images required for 3D reconstruction
   static const int minImages = 20;
@@ -57,7 +58,7 @@ class AppConfig {
 
 class AppConstants {
   // Backend base URL
-  static const String baseUrl = AppConfig.apiBaseUrl;
+  static String get baseUrl => AppConfig.apiBaseUrl;
 }
 
 class AppStrings {
