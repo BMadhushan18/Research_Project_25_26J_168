@@ -62,6 +62,39 @@ class MongoProjectProvider extends ChangeNotifier {
   List<Incident> incidents = [];
   List<AuditLog> auditLog = [];
 
+  // ─── ThreeJS state ─────────────────────────────────────────────────────────
+  String? _threejsFoundation;
+  String? _threejsFinishing;
+  bool _threejsLoading = false;
+
+  String? get threejsFoundation => _threejsFoundation;
+  String? get threejsFinishing => _threejsFinishing;
+  bool get threejsLoading => _threejsLoading;
+
+  Future<String?> fetchThreeJsCategory(String category) async {
+    if (_currentProject == null) return null;
+    _threejsLoading = true;
+    notifyListeners();
+    try {
+      final html = await _api.getThreeJsCategory(_currentProject!.projectId, category);
+      if (category == 'foundation') _threejsFoundation = html;
+      if (category == 'finishing') _threejsFinishing = html;
+      return html;
+    } catch (e) {
+      debugPrint('fetchThreeJsCategory error: $e');
+      return null;
+    } finally {
+      _threejsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void clearThreeJsCache() {
+    _threejsFoundation = null;
+    _threejsFinishing = null;
+    notifyListeners();
+  }
+
   // ─── Helpers ───────────────────────────────────────────────────────────────
   void _setToken(String token) => _api.saveToken(token);
 

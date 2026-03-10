@@ -47,6 +47,11 @@ dependencies:
   # UUID
   uuid: ^4.3.3
 
+  # WebView (for Three.js 3D viewer)
+  webview_flutter: ^4.7.0
+  # Secure storage for API keys
+  flutter_secure_storage: ^8.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -58,6 +63,8 @@ flutter:
   assets:
     - assets/images/
     - assets/models/
+    - AppImages/brands/
+    - AppImages/materials/
     - AppImages/
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

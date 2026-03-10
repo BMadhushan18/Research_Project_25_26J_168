@@ -1,87 +1,263 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import '../providers/mongo_project_provider.dart';
 import '../utils/constants.dart';
 
-class View3DScreen extends StatelessWidget {
+class View3DScreen extends StatefulWidget {
   const View3DScreen({super.key});
 
   @override
+  State<View3DScreen> createState() => _View3DScreenState();
+}
+
+class _View3DScreenState extends State<View3DScreen> {
+  // 'foundation' | 'finishing' | null
+  String? _selectedCategory;
+  WebViewController? _webController;
+  bool _webViewReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Clear stale cache when the screen opens with a fresh project
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MongoProjectProvider>().clearThreeJsCache();
+    });
+  }
+
+  Future<void> _loadCategory(String category) async {
+    final provider = context.read<MongoProjectProvider>();
+    if (provider.currentProject == null) {
+      _showSnack('No project selected. Please select a project on the Home screen.');
+      return;
+    }
+
+    setState(() {
+      _selectedCategory = category;
+      _webViewReady = false;
+    });
+
+    final html = await provider.fetchThreeJsCategory(category);
+
+    if (!mounted) return;
+
+    if (html == null || html.trim().isEmpty) {
+      _showSnack('No 3D data available for ${_label(category)} yet.');
+      setState(() => _selectedCategory = null);
+      return;
+    }
+
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageFinished: (_) {
+          if (mounted) setState(() => _webViewReady = true);
+        },
+      ))
+      ..loadHtmlString(html);
+
+    setState(() => _webController = controller);
+  }
+
+  String _label(String category) =>
+      category == 'foundation' ? 'Foundation' : 'Finishing';
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          '3D Building View',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
-      body: Center(
+    return Consumer<MongoProjectProvider>(
+      builder: (context, provider, _) {
+        final project = provider.currentProject;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: Text(
+              project != null ? '3D View — ${project.projectName ?? project.projectId}' : '3D View',
+              style: const TextStyle(fontSize: 16),
+              overflow: TextOverflow.ellipsis,
+            ),
+            actions: [
+              if (_selectedCategory != null)
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Back to selection',
+                  onPressed: () => setState(() {
+                    _selectedCategory = null;
+                    _webController = null;
+                    _webViewReady = false;
+                  }),
+                ),
+            ],
+          ),
+          body: project == null
+              ? _buildNoProject()
+              : _selectedCategory == null
+                  ? _buildCategorySelector(provider)
+                  : _buildWebView(provider),
+        );
+      },
+    );
+  }
+
+  Widget _buildNoProject() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 110,
-              height: 110,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.view_in_ar_rounded,
-                size: 52,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
+            Icon(Icons.view_in_ar_rounded, size: 72, color: AppColors.primary.withOpacity(0.4)),
+            const SizedBox(height: 16),
             Text(
-              '3D Building View',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
+              'No project selected',
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
-              'Coming Soon',
-              style: TextStyle(
-                fontSize: 15,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'Upload a building plan to visualise your project in 3D.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textHint,
-                  height: 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: null,
-              icon: const Icon(Icons.upload_file_rounded),
-              label: const Text('Upload Plan'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.primary.withOpacity(0.4),
-                disabledForegroundColor: Colors.white70,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 28, vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
+              'Go to the Home screen and select a project first.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+              textAlign: TextAlign.center,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategorySelector(MongoProjectProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Select a 3D View',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Choose which stage of the building to visualise',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 48),
+          _CategoryCard(
+            icon: Icons.foundation_rounded,
+            label: 'Foundation',
+            description: 'Ground-floor layout, boundary walls & openings',
+            color: AppColors.primary,
+            loading: provider.threejsLoading && _selectedCategory == 'foundation',
+            onTap: provider.threejsLoading ? null : () => _loadCategory('foundation'),
+          ),
+          const SizedBox(height: 20),
+          _CategoryCard(
+            icon: Icons.home_work_rounded,
+            label: 'Finishing',
+            description: 'Final interior layout with finishes applied',
+            color: Colors.teal,
+            loading: provider.threejsLoading && _selectedCategory == 'finishing',
+            onTap: provider.threejsLoading ? null : () => _loadCategory('finishing'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebView(MongoProjectProvider provider) {
+    if (_webController == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Stack(
+      children: [
+        WebViewWidget(controller: _webController!),
+        if (!_webViewReady)
+          const Center(child: CircularProgressIndicator()),
+      ],
+    );
+  }
+}
+
+// ─── Category Card ────────────────────────────────────────────────────────────
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+    required this.loading,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: loading
+                    ? Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: color),
+                      )
+                    : Icon(icon, color: color, size: 28),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(description,
+                        style: TextStyle(
+                            fontSize: 13, color: Colors.grey.shade600)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey.shade400, size: 28),
+            ],
+          ),
         ),
       ),
     );

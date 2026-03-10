@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import 'config/app_config.dart' as mongo_cfg;
 import 'providers/mongo_auth_provider.dart';
 import 'providers/mongo_project_provider.dart';
+import 'providers/gemini_provider.dart';
+import 'providers/hf_provider.dart';
+import 'providers/openai_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'utils/constants.dart';
@@ -33,6 +36,9 @@ class MyApp extends StatelessWidget {
         // ── MongoDB providers ─────────────────────────────────────────────────
         ChangeNotifierProvider(create: (_) => MongoAuthProvider()),
         ChangeNotifierProvider(create: (_) => MongoProjectProvider()),
+        ChangeNotifierProvider(create: (_) => GeminiProvider()),
+        ChangeNotifierProvider(create: (_) => HfProvider()),
+        ChangeNotifierProvider(create: (_) => OpenAIProvider()),
       ],
       child: MaterialApp(
         title: 'Smart Construction Manage System',

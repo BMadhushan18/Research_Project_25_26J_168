@@ -81,18 +81,38 @@ class MongoApiService {
     final res = await http.get(Uri.parse(_url(path)), headers: _headers)
         .timeout(const Duration(seconds: 15));
     if (res.statusCode >= 200 && res.statusCode < 300) {
-      return jsonDecode(res.body) as List<dynamic>;
+      try {
+        return jsonDecode(res.body) as List<dynamic>;
+      } on FormatException {
+        throw Exception(_unexpectedResponseMessage(res));
+      }
     }
-    final err = jsonDecode(res.body);
-    throw Exception(err['error'] ?? 'HTTP ${res.statusCode}');
+    try {
+      final err = jsonDecode(res.body);
+      throw Exception(err['error'] ?? 'HTTP ${res.statusCode}');
+    } on FormatException {
+      throw Exception(_unexpectedResponseMessage(res));
+    }
   }
 
   Map<String, dynamic> _parse(http.Response res) {
-    final body = jsonDecode(res.body);
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      return body as Map<String, dynamic>;
+    try {
+      final body = jsonDecode(res.body);
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return body as Map<String, dynamic>;
+      }
+      throw Exception((body as Map)['error'] ?? 'HTTP ${res.statusCode}');
+    } on FormatException {
+      throw Exception(_unexpectedResponseMessage(res));
     }
-    throw Exception((body as Map)['error'] ?? 'HTTP ${res.statusCode}');
+  }
+
+  String _unexpectedResponseMessage(http.Response res) {
+    final snippet = res.body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final preview = snippet.length > 120 ? '${snippet.substring(0, 120)}...' : snippet;
+    return 'Unexpected response from ${res.request?.url ?? 'server'} '
+        '(HTTP ${res.statusCode}). Check that the app is pointing to ${AppConfig.baseUrl}. '
+        'Response: $preview';
   }
 
   // ─── Auth endpoints ────────────────────────────────────────────────────────
@@ -138,6 +158,34 @@ class MongoApiService {
 
   Future<void> deleteProject(String pid) => delete('/projects/$pid');
 
+  Future<Map<String, dynamic>> postBuildingStructure(
+          String pid, Map<String, dynamic> structureData) =>
+      post('/buildingstructure/$pid', structureData);
+
+  Future<Map<String, dynamic>> getBuildingStructure(String pid) =>
+      get('/buildingstructure/$pid');
+
+  Future<Map<String, dynamic>> postStructuralFrame(
+          String pid, Map<String, dynamic> data) =>
+      post('/structuralframe/$pid', data);
+
+  Future<Map<String, dynamic>> getStructuralFrame(String pid) =>
+      get('/structuralframe/$pid');
+
+  Future<Map<String, dynamic>> postWalling(
+          String pid, Map<String, dynamic> data) =>
+      post('/walling/$pid', data);
+
+  Future<Map<String, dynamic>> getWalling(String pid) =>
+      get('/walling/$pid');
+
+  Future<Map<String, dynamic>> postFinishing(
+          String pid, Map<String, dynamic> data) =>
+      post('/finishing/$pid', data);
+
+  Future<Map<String, dynamic>> getFinishing(String pid) =>
+      get('/finishing/$pid');
+
   // ─── Subcollection endpoints ───────────────────────────────────────────────
   Future<List<dynamic>> getSub(String pid, String sub) =>
       getList('/projects/$pid/$sub');
@@ -150,4 +198,42 @@ class MongoApiService {
 
   Future<void> deleteSub(String pid, String sub, String docId) =>
       delete('/projects/$pid/$sub/$docId');
+
+  // ─── ThreeJS endpoints ─────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> getThreeJs(String pid) => get('/threejs/$pid');
+
+  Future<String?> getThreeJsCategory(String pid, String category) async {
+    final res = await get('/threejs/$pid/$category');
+    return res['html_code'] as String?;
+  }
+
+  Future<void> setThreeJsCategory(String pid, String category, String htmlCode) =>
+      post('/threejs/$pid/$category', {'html_code': htmlCode});
+
+  // ─── Materials library ─────────────────────────────────────────────────────
+
+  /// All materials sorted by name. Returns List of {_id, name, brands, sizes}.
+  Future<List<dynamic>> getAllMaterials() => getList('/materials');
+
+  /// Create a material. Returns the created doc.
+  Future<Map<String, dynamic>> createMaterial(
+      String name, List<String> brands, List<String> sizes) =>
+      post('/materials', {'name': name, 'brands': brands, 'sizes': sizes});
+
+  /// Update brands/sizes (and optionally name) for a material by id.
+  Future<Map<String, dynamic>> updateMaterial(
+      String id, {String? name, List<String>? brands, List<String>? sizes}) {
+    final body = <String, dynamic>{};
+    if (name   != null) body['name']   = name;
+    if (brands != null) body['brands'] = brands;
+    if (sizes  != null) body['sizes']  = sizes;
+    return put('/materials/$id', body);
+  }
+
+  /// Delete a material by id.
+  Future<void> deleteMaterial(String id) => delete('/materials/$id');
+
+  /// Brands + sizes for a material name (used by _MatRow select buttons).
+  Future<Map<String, dynamic>> getMaterialOptions(String materialName) =>
+      get('/materials/options/${Uri.encodeComponent(materialName)}');
 }
