@@ -1,4 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import '../providers/mongo_project_provider.dart';
+import '../utils/constants.dart';
+import 'home_page.dart';
+import 'view_3d_screen.dart';
+import 'project_search_screen.dart';
+import 'project_progress/track_progress_screen.dart';
 import 'home_page.dart';
 import 'view_3d_screen.dart';
 import 'project_search_screen.dart';
@@ -9,12 +18,23 @@ import 'package:provider/provider.dart';
 import '../providers/gemini_provider.dart';
 
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  final int initialIndex;
+
+  const MainShell({super.key, this.initialIndex = 0});
 
   @override
   State<MainShell> createState() => _MainShellState();
 }
 
+class _MainShellState extends State<MainShell>
+    with SingleTickerProviderStateMixin {
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex.clamp(0, 3);
+  }
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
@@ -60,6 +80,39 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<MongoProjectProvider>();
+    final selectedProject = provider.currentProject;
+
+    // Pages mapped to bottom nav: 0=Home, 1=3D, 2=Search, 3=Progress
+    // Index 2 in the bar (camera) is an ACTION, not a page.
+    final pages = [
+      const HomePage(),
+      const View3DScreen(),
+      const ProjectSearchScreen(),
+      TrackProgressScreen(
+        pid: selectedProject?.projectId,
+        projectName: selectedProject?.projectName,
+        location: selectedProject?.location,
+      ),
+    ];
+
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
+      extendBody: true,
+      bottomNavigationBar: _BottomNavBar(
+        currentPageIndex: _currentIndex,
+        onItemTap: (barPos) {
+          if (barPos == 2) {
+            _openCamera();
+          } else {
+            final pi = _pageIndexFromBar(barPos);
+            if (pi != _currentIndex) {
+              HapticFeedback.selectionClick();
+              setState(() => _currentIndex = pi);
+            }
     return PopScope(
       // Intercept Android back: pop within the current tab's navigator first.
       canPop: false,
@@ -117,6 +170,34 @@ class _MainShellState extends State<MainShell> {
       ),
     );
   }
+}
+
+// ─── Custom Bottom Nav Bar ────────────────────────────────────────────────────
+class _BottomNavBar extends StatelessWidget {
+  final int currentPageIndex;
+  final ValueChanged<int> onItemTap;
+
+  const _BottomNavBar({
+    required this.currentPageIndex,
+    required this.onItemTap,
+  });
+
+  // bar position → page index (camera is action so -1)
+  bool _isSelected(int barPos) {
+    if (barPos == 2) return false; // camera never "selected"
+    final pi = barPos < 2 ? barPos : barPos - 1;
+    return pi == currentPageIndex;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _NavItem(icon: Icons.home_rounded, label: 'Home'),
+      _NavItem(icon: Icons.view_in_ar_rounded, label: '3D View'),
+      _NavItem(icon: Icons.camera_alt_rounded, label: 'Camera', isCenter: true),
+      _NavItem(icon: Icons.search_rounded, label: 'Projects'),
+      _NavItem(icon: Icons.bar_chart_rounded, label: 'Progress'),
+    ];
 
   Widget _buildBottomNav() {
     return Container(

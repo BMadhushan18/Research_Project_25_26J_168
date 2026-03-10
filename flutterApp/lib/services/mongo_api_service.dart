@@ -41,45 +41,97 @@ class MongoApiService {
       };
 
   String _url(String path) => '${AppConfig.baseUrl}$path';
+  String _itUrl(String path) => '${AppConfig.itBaseUrl}$path';
 
   Future<Map<String, dynamic>> get(String path) async {
     await _ensureToken();
-    final res = await http.get(Uri.parse(_url(path)), headers: _headers)
+    final res = await http
+        .get(Uri.parse(_url(path)), headers: _headers)
         .timeout(const Duration(seconds: 15));
     return _parse(res);
   }
 
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
     await _ensureToken();
-    final res = await http.post(
-      Uri.parse(_url(path)),
-      headers: _headers,
-      body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 15));
+    final res = await http
+        .post(
+          Uri.parse(_url(path)),
+          headers: _headers,
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 15));
+    return _parse(res);
+  }
+
+  Future<Map<String, dynamic>> postAbsolute(String absoluteUrl, Map<String, dynamic> body) async {
+    await _ensureToken();
+    final res = await http
+        .post(
+          Uri.parse(absoluteUrl),
+          headers: _headers,
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 15));
+    return _parse(res);
+  }
+
+  Future<List<dynamic>> getListAbsolute(String absoluteUrl) async {
+    await _ensureToken();
+    final res = await http
+        .get(Uri.parse(absoluteUrl), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return jsonDecode(res.body) as List<dynamic>;
+    }
+
+    final decoded = _tryDecodeJson(res.body);
+    if (decoded is Map && decoded['error'] != null) {
+      throw Exception(decoded['error']);
+    }
+
+    final preview = res.body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final snippet = preview.length > 120 ? '${preview.substring(0, 120)}...' : preview;
+    throw Exception(
+      'HTTP ${res.statusCode}: non-JSON response from ${res.request?.url}. '
+      'Check AppConfig base URLs/ports. Response: $snippet',
+    );
+  }
+
+  Future<Map<String, dynamic>> getAbsolute(String absoluteUrl) async {
+    await _ensureToken();
+    final res = await http
+        .get(Uri.parse(absoluteUrl), headers: _headers)
+        .timeout(const Duration(seconds: 15));
     return _parse(res);
   }
 
   Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body) async {
     await _ensureToken();
-    final res = await http.put(
-      Uri.parse(_url(path)),
-      headers: _headers,
-      body: jsonEncode(body),
-    ).timeout(const Duration(seconds: 15));
+    final res = await http
+        .put(
+          Uri.parse(_url(path)),
+          headers: _headers,
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 15));
     return _parse(res);
   }
 
   Future<Map<String, dynamic>> delete(String path) async {
     await _ensureToken();
-    final res = await http.delete(Uri.parse(_url(path)), headers: _headers)
+    final res = await http
+        .delete(Uri.parse(_url(path)), headers: _headers)
         .timeout(const Duration(seconds: 15));
     return _parse(res);
   }
 
   Future<List<dynamic>> getList(String path) async {
     await _ensureToken();
-    final res = await http.get(Uri.parse(_url(path)), headers: _headers)
+    final res = await http
+        .get(Uri.parse(_url(path)), headers: _headers)
         .timeout(const Duration(seconds: 15));
+
     if (res.statusCode >= 200 && res.statusCode < 300) {
       try {
         return jsonDecode(res.body) as List<dynamic>;
@@ -92,6 +144,42 @@ class MongoApiService {
       throw Exception(err['error'] ?? 'HTTP ${res.statusCode}');
     } on FormatException {
       throw Exception(_unexpectedResponseMessage(res));
+    }
+
+    final err = jsonDecode(res.body);
+    throw Exception(err['error'] ?? 'HTTP ${res.statusCode}');
+  }
+
+  Map<String, dynamic> _parse(http.Response res) {
+    final decoded = _tryDecodeJson(res.body);
+
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      if (decoded is Map<String, dynamic>) return decoded;
+      // Safety: some endpoints could return non-map JSON
+      if (decoded != null) return {'data': decoded};
+      return {
+        'data': res.body,
+      };
+    }
+
+    if (decoded is Map && decoded['error'] != null) {
+      throw Exception(decoded['error']);
+    }
+
+    final preview = res.body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final snippet = preview.length > 120 ? '${preview.substring(0, 120)}...' : preview;
+
+    throw Exception(
+      'HTTP ${res.statusCode}: non-JSON response from ${res.request?.url}. '
+      'Check AppConfig.baseUrl/port. Response: $snippet',
+    );
+  }
+
+  dynamic _tryDecodeJson(String body) {
+    try {
+      return jsonDecode(body);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -116,7 +204,11 @@ class MongoApiService {
   }
 
   // ─── Auth endpoints ────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> signup(String email, String password, String displayName) async {
+  Future<Map<String, dynamic>> signup(
+    String email,
+    String password,
+    String displayName,
+  ) async {
     final res = await post('/auth/signup', {
       'email': email,
       'password': password,
@@ -187,8 +279,7 @@ class MongoApiService {
       get('/finishing/$pid');
 
   // ─── Subcollection endpoints ───────────────────────────────────────────────
-  Future<List<dynamic>> getSub(String pid, String sub) =>
-      getList('/projects/$pid/$sub');
+  Future<List<dynamic>> getSub(String pid, String sub) => getList('/projects/$pid/$sub');
 
   Future<Map<String, dynamic>> addSub(String pid, String sub, Map<String, dynamic> data) =>
       post('/projects/$pid/$sub', data);
@@ -199,6 +290,138 @@ class MongoApiService {
   Future<void> deleteSub(String pid, String sub, String docId) =>
       delete('/projects/$pid/$sub/$docId');
 
+  //######################### IT22574718 #######################################################
+
+
+  // ─── Duration Prediction endpoints ────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> predictDuration(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/ml/predict-duration'), payload);
+  }
+
+  // Foundation phase prediction endpoint
+  Future<Map<String, dynamic>> predictFoundationDuration(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/ml/predict-foundation'), payload);
+  }
+
+  // Structural wall phase prediction endpoint
+  Future<Map<String, dynamic>> predictWallDuration(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/ml/predict-wall'), payload);
+  }
+
+  // Roofing phase prediction endpoint
+  Future<Map<String, dynamic>> predictRoofDuration(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/ml/predict-roof'), payload);
+  }
+
+  // Door and window fixture phase prediction endpoint
+  Future<Map<String, dynamic>> predictDoorWindowDuration(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/ml/predict-door-window'), payload);
+  }
+
+  // Plastering phase prediction endpoint
+  Future<Map<String, dynamic>> predictPlasteringDuration(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/ml/predict-plastering'), payload);
+  }
+
+  // Flooring phase prediction endpoint
+  Future<Map<String, dynamic>> predictFlooringDuration(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/ml/predict-flooring'), payload);
+  }
+
+  // Painting and finishing phase prediction endpoint
+  Future<Map<String, dynamic>> predictPaintingDuration(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/ml/predict-painting'), payload);
+  }
+
+  /// Save a phase duration row: uid (from token) + pid + phaseId + phaseName + durationDays + laborCount
+  // Keep this (named params) to avoid breaking existing code.
+  Future<Map<String, dynamic>> savePhaseDuration({
+    required String pid,
+    required String phaseId,
+    required String phaseName,
+    required int durationDays,
+    required int laborCount,
+  }) {
+    return postAbsolute(_itUrl('/phase-durations/save'), {
+      "pid": pid,
+      "phaseId": phaseId,
+      "phaseName": phaseName,
+      "durationDays": durationDays,
+      "laborCount": laborCount,
+    });
+  }
+
+  Future<Map<String, dynamic>> savePhaseDurationPayload(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/phase-durations/save'), payload);
+  }
+
+  Future<Map<String, dynamic>> savePhaseDailyLogPayload(Map<String, dynamic> payload) {
+    return postAbsolute(_itUrl('/phase-daily-logs/save'), payload);
+  }
+
+  Future<List<dynamic>> getRecentPhaseDailyLogs(
+    String pid,
+    String phaseId, {
+    int limit = 7,
+  }) {
+    final normalizedLimit = limit < 1 ? 1 : limit;
+    return getListAbsolute(_itUrl('/phase-daily-logs/recent/$pid/$phaseId?limit=$normalizedLimit'));
+  }
+
+  Future<int> getCompletedPhaseDays(String pid, String phaseId) async {
+    final res = await getAbsolute(_itUrl('/phase-daily-logs/completed-days/$pid/$phaseId'));
+    final value = res['completedDays'];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse('${value ?? ''}') ?? 0;
+  }
+
+  Future<Map<String, dynamic>> completePhaseDuration({
+    required String pid,
+    required String phaseId,
+    required String actualCompletedDate,
+  }) {
+    return postAbsolute(_itUrl('/phase-durations/complete'), {
+      'pid': pid,
+      'phaseId': phaseId,
+      'actualCompletedDate': actualCompletedDate,
+    });
+  }
+
+  Future<Map<String, dynamic>> savePhaseDailyLog({
+    required String pid,
+    required String phaseId,
+    required String phaseName,
+    required String logDate,
+    required bool workedToday,
+    required int laborCount,
+    required String? workType,
+    required int hoursPerLabor,
+    required int dailyManHours,
+    String? skipReason,
+  }) {
+    return postAbsolute(_itUrl('/phase-daily-logs/save'), {
+      'pid': pid,
+      'phaseId': phaseId,
+      'phaseName': phaseName,
+      'logDate': logDate,
+      'workedToday': workedToday,
+      'laborCount': laborCount,
+      'workType': workType,
+      'hoursPerLabor': hoursPerLabor,
+      'dailyManHours': dailyManHours,
+      'skipReason': skipReason,
+    });
+  }
+
+  // Get all phase durations for a project
+  Future<List<dynamic>> getPhaseDurations(String pid) {
+    return getListAbsolute(_itUrl('/phase-durations/$pid'));
+  }
+
+  //######################### IT22574718#######################################################
+}
   // ─── ThreeJS endpoints ─────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getThreeJs(String pid) => get('/threejs/$pid');
 

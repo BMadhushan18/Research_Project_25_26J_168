@@ -8,6 +8,10 @@ class AppConfig {
 
   static const bool kUseMongo = true;
 
+  /// PC's local WiFi IP — Android device must be on the same network.
+  static const String backendHost = '192.168.8.103';
+  // Core Mongo backend (auth/projects/subcollections).
+  static const int    backendPort = 8090;
   /// Optional overrides:
   /// flutter run --dart-define=BACKEND_HOST=192.168.x.x --dart-define=BACKEND_PORT=8090
   static const String _backendHostOverride =
@@ -33,5 +37,9 @@ class AppConfig {
     return '127.0.0.1';
   }
 
+  // IT22574718 backend module (ML + phase progress tracking).
+  static const int    itBackendPort = 8091;
+
   static String get baseUrl => 'http://$backendHost:$backendPort';
+  static String get itBaseUrl => 'http://$backendHost:$itBackendPort';
 }
