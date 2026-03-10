@@ -1,8 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
-import '../../../providers/mongo_project_provider.dart';
-import '../../../models/project/material_model.dart';
 import '../../../services/mongo_api_service.dart';
 import '../material_library_screen.dart';
 
@@ -168,23 +164,57 @@ const List<_ProcessSection> _kBlueprint = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-class MaterialsTab extends StatelessWidget {
+class MaterialsTab extends StatefulWidget {
   final String? roomLabel;
   final Map<String, dynamic>? roomData;
 
   const MaterialsTab({super.key, this.roomLabel, this.roomData});
 
   @override
-  Widget build(BuildContext context) {
-    if (roomLabel != null) {
-      return _MaterialBlueprintView(
-          roomLabel: roomLabel!, roomData: roomData);
+  State<MaterialsTab> createState() => _MaterialsTabState();
+}
+
+class _MaterialsTabState extends State<MaterialsTab> {
+  List<Map<String, dynamic>> _globalMaterials = [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.roomLabel == null) _loadGlobalMaterials();
+  }
+
+  Future<void> _loadGlobalMaterials() async {
+    setState(() => _loading = true);
+    try {
+      final api = MongoApiService();
+      await api.loadToken();
+      final list = await api.getAllMaterials();
+      if (mounted) {
+        setState(() =>
+            _globalMaterials = list.cast<Map<String, dynamic>>());
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
+  }
 
-    // ── No room selected: existing materials list ─────────────────────
-    final pp = context.watch<ProjectProvider>();
-    final items = pp.materials;
+  Map<String, List<Map<String, dynamic>>> _byCategory() {
+    final r = <String, List<Map<String, dynamic>>>{};
+    for (final m in _globalMaterials) {
+      final cat = (m['category'] as String?) ?? 'General';
+      r.putIfAbsent(cat, () => []).add(m);
+    }
+    return r;
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    if (widget.roomLabel != null) {
+      return _MaterialBlueprintView(
+          roomLabel: widget.roomLabel!, roomData: widget.roomData);
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -192,52 +222,43 @@ class MaterialsTab extends StatelessWidget {
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Project Materials',
+        title: const Text('Materials Library',
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
         actions: [
-          Tooltip(
-            message: 'Manage Material Library',
-            child: IconButton(
-              icon: const Icon(Icons.library_books_outlined),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const MaterialLibraryScreen()),
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh_outlined),
+            tooltip: 'Refresh',
+            onPressed: _loadGlobalMaterials,
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddDialog(context),
+        onPressed: () => _showAddSheet(context),
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
-      body: items.isEmpty
-          ? _buildEmpty(context)
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: items.length,
-              itemBuilder: (_, i) => _MaterialTile(material: items[i]),
-            ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _globalMaterials.isEmpty
+              ? _buildEmpty()
+              : _buildTable(),
     );
   }
 
-  Widget _buildEmpty(BuildContext context) => Center(
+  Widget _buildEmpty() => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inventory_2_outlined,
-                size: 64, color: Colors.grey[300]),
+            Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[300]),
             const SizedBox(height: 12),
-            const Text('No materials yet',
+            const Text('No materials loaded',
                 style: TextStyle(fontSize: 16, color: Colors.grey)),
             const SizedBox(height: 8),
             ElevatedButton.icon(
-              onPressed: () => _showAddDialog(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Material'),
+              onPressed: _loadGlobalMaterials,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reload'),
               style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1565C0),
                   foregroundColor: Colors.white),
@@ -246,151 +267,688 @@ class MaterialsTab extends StatelessWidget {
         ),
       );
 
-  void _showAddDialog(BuildContext context) {
+  Widget _buildTable() {
+    final grouped = _byCategory();
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+      children: grouped.entries
+          .map((e) => _CategoryCard(
+                category: e.key,
+                materials: e.value,
+              ))
+          .toList(),
+    );
+  }
+
+  void _showAddSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => const _AddMaterialSheet(),
+      builder: (_) => _AddMaterialSheet(onAdded: _loadGlobalMaterials),
     );
   }
 }
 
-class _MaterialTile extends StatelessWidget {
-  final MaterialModel material;
-  const _MaterialTile({required this.material});
+// ─── Category card (groups materials by category in a scrollable table) ───────
+
+class _CategoryCard extends StatelessWidget {
+  final String category;
+  final List<Map<String, dynamic>> materials;
+  const _CategoryCard({required this.category, required this.materials});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1565C0).withAlpha(20),
-            borderRadius: BorderRadius.circular(8),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withAlpha(15),
+              blurRadius: 8,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Category header ───────────────────────────────────────────
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1565C0).withAlpha(15),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
+              border: Border(
+                  bottom: BorderSide(
+                      color: const Color(0xFF1565C0).withAlpha(40))),
+            ),
+            child: Row(children: [
+              Icon(_categoryIcon(category),
+                  size: 18, color: const Color(0xFF1565C0)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(category,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color(0xFF1565C0))),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1565C0).withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('${materials.length}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF1565C0),
+                        fontWeight: FontWeight.w600)),
+              ),
+            ]),
           ),
-          child: const Icon(Icons.inventory_2,
-              color: Color(0xFF1565C0), size: 20),
-        ),
-        title: Text(material.materialName,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text('${material.category} · ${material.baseUnit}'),
-        trailing: Text(
-            '${material.allowedSizes.length} size${material.allowedSizes.length != 1 ? 's' : ''}',
-            style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+          // ── Scrollable table ──────────────────────────────────────────
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 680),
+              child: Column(children: [
+                // Header row
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(children: const [
+                    SizedBox(width: 44), // image
+                    SizedBox(width: 8),
+                    SizedBox(
+                        width: 150,
+                        child: Text('Material',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF757575)))),
+                    SizedBox(width: 8),
+                    SizedBox(
+                        width: 52,
+                        child: Text('Unit',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF757575)))),
+                    SizedBox(width: 8),
+                    SizedBox(
+                        width: 160,
+                        child: Text('Brands',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF757575)))),
+                    SizedBox(width: 8),
+                    SizedBox(
+                        width: 155,
+                        child: Text('Sizes',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF757575)))),
+                    SizedBox(width: 8),
+                    SizedBox(
+                        width: 110,
+                        child: Text('Unit Price (LKR)',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF757575)))),
+                  ]),
+                ),
+                const Divider(height: 1, thickness: 1),
+                for (int i = 0; i < materials.length; i++)
+                  _MaterialTableRow(
+                      material: materials[i],
+                      isLast: i == materials.length - 1),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
       ),
     );
   }
+
+  IconData _categoryIcon(String cat) {
+    final c = cat.toLowerCase();
+    if (c.contains('concrete') || c.contains('foundation'))
+      return Icons.foundation;
+    if (c.contains('steel')) return Icons.hardware_outlined;
+    if (c.contains('masonry') || c.contains('walling'))
+      return Icons.bento_outlined;
+    if (c.contains('plaster') || c.contains('finish'))
+      return Icons.format_paint_outlined;
+    if (c.contains('floor')) return Icons.grid_on_outlined;
+    if (c.contains('roof')) return Icons.roofing_outlined;
+    if (c.contains('door') || c.contains('window'))
+      return Icons.door_front_door_outlined;
+    if (c.contains('paint') || c.contains('coating'))
+      return Icons.brush_outlined;
+    if (c.contains('electrical'))
+      return Icons.electrical_services_outlined;
+    if (c.contains('plumb')) return Icons.water_outlined;
+    return Icons.inventory_2_outlined;
+  }
 }
 
+// ─── One material row in the library table ───────────────────────────────────
+
+class _MaterialTableRow extends StatelessWidget {
+  final Map<String, dynamic> material;
+  final bool isLast;
+  const _MaterialTableRow(
+      {required this.material, required this.isLast});
+
+  String _formatPrice(dynamic price) {
+    if (price == null) return '—';
+    final n = price is num ? price.toDouble() : double.tryParse('$price') ?? 0;
+    final s = n.toStringAsFixed(0);
+    // thousands separator
+    final formatted = s.replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+    return 'LKR $formatted';
+  }
+
+  String _truncate(List<String> list) {
+    if (list.isEmpty) return '—';
+    if (list.length <= 2) return list.join(', ');
+    return '${list.take(2).join(', ')} +${list.length - 2}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = material['name'] as String? ?? '';
+    final unit = material['unit'] as String? ?? '';
+    final brands = List<String>.from(material['brands'] as List? ?? []);
+    final sizes = List<String>.from(material['sizes'] as List? ?? []);
+    final imgPath = _matImagePath(name);
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Image
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: imgPath != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(7),
+                          child: Image.asset(imgPath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  _placeholder(name)),
+                        )
+                      : _placeholder(name),
+                ),
+                const SizedBox(width: 8),
+                // Name
+                SizedBox(
+                  width: 150,
+                  child: Text(name,
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 8),
+                // Unit badge
+                SizedBox(
+                  width: 52,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1565C0).withAlpha(18),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(unit,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF1565C0),
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Brands
+                SizedBox(
+                  width: 160,
+                  child: Text(_truncate(brands),
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.grey[700]),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 8),
+                // Sizes
+                SizedBox(
+                  width: 155,
+                  child: Text(_truncate(sizes),
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.grey[700]),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 8),
+                // Unit price
+                SizedBox(
+                  width: 110,
+                  child: Text(_formatPrice(material['unitPrice']),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2E7D32))),
+                ),
+              ]),
+        ),
+        if (!isLast) const Divider(height: 1),
+      ],
+    );
+  }
+
+  Widget _placeholder(String name) => Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1565C0).withAlpha(20),
+          borderRadius: BorderRadius.circular(7),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1565C0)),
+        ),
+      );
+}
+
+// ─── Add Material Sheet (comprehensive form) ─────────────────────────────────
+
 class _AddMaterialSheet extends StatefulWidget {
-  const _AddMaterialSheet();
+  final VoidCallback? onAdded;
+  const _AddMaterialSheet({this.onAdded});
+
   @override
   State<_AddMaterialSheet> createState() => _AddMaterialSheetState();
 }
 
 class _AddMaterialSheetState extends State<_AddMaterialSheet> {
   final _form = GlobalKey<FormState>();
-  final _name = TextEditingController();
-  final _category = TextEditingController();
-  final _unit = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _priceCtrl = TextEditingController();
+  final _brandInput = TextEditingController();
+  final _sizeInput = TextEditingController();
+
+  String _selectedCategory = 'Concrete & Foundation';
+  String _selectedUnit = 'bag';
+  final List<String> _brands = [];
+  final List<String> _sizes = [];
   bool _saving = false;
+
+  static const _categories = [
+    'Concrete & Foundation',
+    'Structural Steel',
+    'Masonry & Walling',
+    'Plastering & Finishing',
+    'Flooring',
+    'Roofing',
+    'Doors & Windows',
+    'Paint & Coatings',
+    'Electrical',
+    'Plumbing',
+    'Ironmongery & Misc',
+    'General',
+  ];
+
+  static const _units = [
+    'bag', 'kg', 'm³', 'm²', 'm', 'L', 'No.', 'ton', 'Set'
+  ];
 
   @override
   void dispose() {
-    _name.dispose();
-    _category.dispose();
-    _unit.dispose();
+    _nameCtrl.dispose();
+    _priceCtrl.dispose();
+    _brandInput.dispose();
+    _sizeInput.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 24,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24),
-      child: Form(
-        key: _form,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Add Material',
-                style:
-                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            _tf(_name, 'Material Name *',
-                validator: (v) =>
-                    v == null || v.isEmpty ? 'Required' : null),
-            _tf(_category, 'Category (e.g. Cement, Steel)'),
-            _tf(_unit, 'Unit (e.g. Bag, Kg, m³)'),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1565C0),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
-                    : const Text('Add'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _addBrand() {
+    final v = _brandInput.text.trim();
+    if (v.isNotEmpty && !_brands.contains(v)) {
+      setState(() => _brands.add(v));
+      _brandInput.clear();
+    }
   }
 
-  Widget _tf(TextEditingController c, String label,
-      {String? Function(String?)? validator}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: TextFormField(
-        controller: c,
-        validator: validator,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8)),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        ),
-      ),
-    );
+  void _addSize() {
+    final v = _sizeInput.text.trim();
+    if (v.isNotEmpty && !_sizes.contains(v)) {
+      setState(() => _sizes.add(v));
+      _sizeInput.clear();
+    }
   }
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
     setState(() => _saving = true);
-    final pp = context.read<ProjectProvider>();
-    await pp.addMaterial(MaterialModel(
-      materialId: const Uuid().v4(),
-      materialName: _name.text.trim(),
-      category: _category.text.trim().isEmpty ? 'General' : _category.text.trim(),
-      baseUnit: _unit.text.trim().isEmpty ? 'Unit' : _unit.text.trim(),
-    ));
-    setState(() => _saving = false);
-    if (context.mounted) Navigator.pop(context);
+    try {
+      final api = MongoApiService();
+      await api.loadToken();
+      await api.createMaterial(
+        name: _nameCtrl.text.trim(),
+        category: _selectedCategory,
+        unit: _selectedUnit,
+        brands: _brands,
+        sizes: _sizes,
+        unitPrice: _priceCtrl.text.trim().isEmpty
+            ? null
+            : double.tryParse(_priceCtrl.text.trim()),
+      );
+      widget.onAdded?.call();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.92,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      expand: false,
+      builder: (ctx, scroll) => Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Column(children: [
+          // Drag handle
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 4),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2)),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Text('Add Material',
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: scroll,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Form(
+                key: _form,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Material Name ─────────────────────────────
+                    _label('Material Name *'),
+                    TextFormField(
+                      controller: _nameCtrl,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
+                      decoration: _inputDeco('e.g. Cement (OPC)'),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // ── Category ──────────────────────────────────
+                    _label('Category'),
+                    DropdownButtonFormField<String>(
+                      value: _selectedCategory,
+                      decoration: _inputDeco(null),
+                      isExpanded: true,
+                      items: _categories
+                          .map((c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(c,
+                                  style: const TextStyle(fontSize: 13))))
+                          .toList(),
+                      onChanged: (v) =>
+                          setState(() => _selectedCategory = v!),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // ── Unit ──────────────────────────────────────
+                    _label('Unit'),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: _units.map((u) {
+                        final sel = _selectedUnit == u;
+                        return GestureDetector(
+                          onTap: () =>
+                              setState(() => _selectedUnit = u),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 140),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: sel
+                                  ? const Color(0xFF1565C0)
+                                  : Colors.grey[100],
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: sel
+                                      ? const Color(0xFF1565C0)
+                                      : Colors.grey[300]!),
+                            ),
+                            child: Text(u,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: sel
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                    color: sel
+                                        ? Colors.white
+                                        : Colors.grey[700])),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // ── Unit Price ────────────────────────────────
+                    _label('Unit Price (LKR)'),
+                    TextFormField(
+                      controller: _priceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: _inputDeco('e.g. 2200'),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // ── Brands ────────────────────────────────────
+                    _label('Brands'),
+                    ..._brands.asMap().entries.map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1565C0)
+                                      .withAlpha(12),
+                                  borderRadius:
+                                      BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: const Color(0xFF1565C0)
+                                          .withAlpha(60)),
+                                ),
+                                child: Text(e.value,
+                                    style: const TextStyle(
+                                        fontSize: 13)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => setState(
+                                  () => _brands.removeAt(e.key)),
+                              child: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Colors.redAccent,
+                                  size: 20),
+                            ),
+                          ]),
+                        )),
+                    Row(children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _brandInput,
+                          decoration: _inputDeco('Add brand name'),
+                          onFieldSubmitted: (_) => _addBrand(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _addBtn(_addBrand),
+                    ]),
+                    const SizedBox(height: 14),
+
+                    // ── Sizes ─────────────────────────────────────
+                    _label('Sizes / Variants'),
+                    ..._sizes.asMap().entries.map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color:
+                                      Colors.green.withAlpha(15),
+                                  borderRadius:
+                                      BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: Colors.green
+                                          .withAlpha(60)),
+                                ),
+                                child: Text(e.value,
+                                    style: const TextStyle(
+                                        fontSize: 13)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () =>
+                                  setState(() => _sizes.removeAt(e.key)),
+                              child: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Colors.redAccent,
+                                  size: 20),
+                            ),
+                          ]),
+                        )),
+                    Row(children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _sizeInput,
+                          decoration: _inputDeco(
+                              'Add size (e.g. 50 kg, 200×200 mm)'),
+                          onFieldSubmitted: (_) => _addSize(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _addBtn(_addSize),
+                    ]),
+                    const SizedBox(height: 24),
+
+                    // ── Save button ───────────────────────────────
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _saving ? null : _save,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1565C0),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: _saving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2))
+                            : const Text('Save Material',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF455A64))),
+      );
+
+  InputDecoration _inputDeco(String? hint) => InputDecoration(
+        hintText: hint,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        isDense: true,
+      );
+
+  Widget _addBtn(VoidCallback onTap) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1565C0),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: const Icon(Icons.add, color: Colors.white, size: 22),
+        ),
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -9,7 +9,6 @@ import 'tabs/workers_tab.dart';
 import 'tabs/boq_tab.dart';
 import 'tabs/purchasing_tab.dart';
 import 'tabs/progress_tab.dart';
-import 'tabs/safety_tab.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
   const ProjectDetailScreen({super.key});
@@ -31,7 +30,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     _TabItem(Icons.format_list_numbered, 'BOQ'),
     _TabItem(Icons.shopping_cart_outlined, 'Purchasing'),
     _TabItem(Icons.bar_chart_outlined, 'Progress'),
-    _TabItem(Icons.health_and_safety_outlined, 'Safety'),
   ];
 
   @override
@@ -117,7 +115,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                 const BOQTab(),
                 const PurchasingTab(),
                 const ProgressTab(),
-                const SafetyTab(),
               ],
             ),
     );

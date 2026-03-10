@@ -427,15 +427,30 @@ class MongoApiService {
     await post('/threejs/$pid/$category', {'html_code': htmlCode});
   }
 
+  // ─── BOQ computed report ───────────────────────────────────────────────────
+  /// Calls GET /boq/<pid> to get backend-computed BOQ sections with material rows.
+  /// Returns a map with keys: sections (List), hasData (bool), metrics (Map?), message (String?).
+  Future<Map<String, dynamic>> getBoqReport(String pid) => get('/boq/$pid');
+
   // ─── Materials library ─────────────────────────────────────────────────────
   Future<List<dynamic>> getAllMaterials() => getList('/materials');
 
-  Future<Map<String, dynamic>> createMaterial(
-    String name,
-    List<String> brands,
-    List<String> sizes,
-  ) {
-    return post('/materials', {'name': name, 'brands': brands, 'sizes': sizes});
+  Future<Map<String, dynamic>> createMaterial({
+    required String name,
+    String category = 'General',
+    String unit = 'No.',
+    List<String> brands = const [],
+    List<String> sizes = const [],
+    double? unitPrice,
+  }) {
+    return post('/materials', {
+      'name': name,
+      'category': category,
+      'unit': unit,
+      'brands': brands,
+      'sizes': sizes,
+      if (unitPrice != null) 'unitPrice': unitPrice,
+    });
   }
 
   Future<Map<String, dynamic>> updateMaterial(

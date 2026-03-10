@@ -13,11 +13,8 @@ import 'create_project_flow.dart';
 import 'projects/projects_screen.dart';
 import 'build_project_screen.dart';
 import 'settings_gemini.dart';
-import 'contour_detection_screen.dart';
-import 'edge_detection_screen.dart';
-import 'comprehensive_cv_screen.dart';
-import 'hough_line_transform_screen.dart';
-import 'combined_hough_contour_screen.dart';
+import 'boq_screen.dart';
+import 'progress_overview_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -196,19 +193,7 @@ class _HomePageState extends State<HomePage>
 
               _buildAdditionalTools(),
 
-              const SizedBox(height: 24),
-              Text(
-                'My Projects',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildMyProjectsSection(),
 
-              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -445,27 +430,15 @@ class _HomePageState extends State<HomePage>
           ),
         ),
         _buildFeatureCard(
-          icon: Icons.precision_manufacturing_rounded,
-          title: 'Smart Logistics',
-          description: 'Equipment management',
+          icon: Icons.bar_chart_rounded,
+          title: 'Progress',
+          description: 'Track project progress',
           color: Colors.deepPurple,
-          backgroundImage: 'AppImages/machine_and_hardware.jpg',
+          backgroundIcon: Icons.bar_chart,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => const MachineManagementScreen()),
-          ),
-        ),
-        _buildFeatureCard(
-          icon: Icons.calculate_rounded,
-          title: 'Material Estimate',
-          description: 'Cost calculations',
-          color: AppColors.success,
-          backgroundImage: 'AppImages/material_estimate.png',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const MaterialEstimateScreen()),
+                builder: (context) => const ProgressOverviewScreen()),
           ),
         ),
       ],
@@ -476,46 +449,37 @@ class _HomePageState extends State<HomePage>
     return Column(
       children: [
         _buildToolCard(
-          icon: Icons.architecture_rounded,
-          title: 'Build the Project',
-          description: 'Upload building plan → AI structural JSON analysis',
+          icon: Icons.receipt_long_rounded,
+          title: 'BOQ Report',
+          description: 'Bill of quantities — material breakdown by section',
           color: const Color(0xFF00897B),
-          onTap: _navigateToBuildProject,
-        ),
-        const SizedBox(height: 12),
-        _buildToolCard(
-          icon: Icons.auto_awesome_mosaic_rounded,
-          title: 'Contour Detection',
-          description: 'Upload any image — detect and highlight edges & contours',
-          color: const Color(0xFF1565C0),
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(
-                builder: (context) => const ContourDetectionScreen()),
+            MaterialPageRoute(builder: (context) => const BOQScreen()),
           ),
         ),
         const SizedBox(height: 12),
         _buildToolCard(
-          icon: Icons.blur_on_rounded,
-          title: 'Edge Detection',
-          description: 'Upload any image — detect and highlight edges',
+          icon: Icons.currency_rupee_rounded,
+          title: 'Cost Report',
+          description: 'Detailed cost estimation and budget analysis',
           color: const Color(0xFF1565C0),
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => const EdgeDetectionScreen()),
+                builder: (context) => const CostEstimationScreen()),
           ),
         ),
         const SizedBox(height: 12),
         _buildToolCard(
-          icon: Icons.analytics_rounded,
-          title: 'Comprehensive CV',
-          description: 'Complete analysis: edges, shapes, and corners',
-          color: const Color(0xFF4CAF50),
+          icon: Icons.precision_manufacturing_rounded,
+          title: 'Machinery and Labour',
+          description: 'Equipment and workforce management',
+          color: const Color(0xFF6A1B9A),
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => const ComprehensiveCVScreen()),
+                builder: (context) => const MachineManagementScreen()),
           ),
         ),
       ],
@@ -866,75 +830,6 @@ class _HomePageState extends State<HomePage>
                       context,
                       MaterialPageRoute(
                           builder: (context) => const ProjectsScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.auto_awesome_mosaic_rounded,
-                  title: 'Contour Detection',
-                  color: const Color(0xFF1565C0),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              const ContourDetectionScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.blur_on_rounded,
-                  title: 'Edge Detection',
-                  color: const Color(0xFF1565C0),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const EdgeDetectionScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.analytics_rounded,
-                  title: 'Comprehensive CV',
-                  color: const Color(0xFF4CAF50),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              const ComprehensiveCVScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.line_axis_rounded,
-                  title: 'Hough Line Transform',
-                  color: const Color(0xFF9C27B0),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              const HoughLineTransformScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  icon: Icons.hub_rounded,
-                  title: 'CombinedHoughlineNcontour',
-                  color: const Color(0xFF6A1B9A),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              const CombinedHoughContourScreen()),
                     );
                   },
                 ),
