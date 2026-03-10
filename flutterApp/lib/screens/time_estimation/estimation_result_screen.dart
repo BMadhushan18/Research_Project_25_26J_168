@@ -1,3 +1,5 @@
+import 'package:provider/provider.dart';
+import '../../providers/mongo_project_provider.dart';
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
 import 'phase_wise_duration_screen.dart';
@@ -31,7 +33,7 @@ class EstimationResultScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Total Duration'),
+        title: const Text('Estimation Result'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -46,7 +48,7 @@ class EstimationResultScreen extends StatelessWidget {
                 _buildDurationCard(),
                 const SizedBox(height: 16),
 
-                // ✅ show total days clearly (no decimals)
+                //  show total days clearly (no decimals)
                 Text(
                   'Total: $durationDays day${durationDays == 1 ? '' : 's'}',
                   style: TextStyle(
@@ -124,6 +126,10 @@ class EstimationResultScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
+          // Line by line duration:
+          // 1 month
+          // 3 weeks
+          // 5 days
           Column(
             mainAxisSize: MainAxisSize.min,
             children: lines
@@ -147,32 +153,42 @@ class EstimationResultScreen extends StatelessWidget {
   }
 
   Widget _buildPhaseWiseButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 60,
-      child: ElevatedButton.icon(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PhaseWiseDurationScreen(),
-            ),
+  return SizedBox(
+    width: double.infinity,
+    height: 60,
+    child: ElevatedButton.icon(
+      onPressed: () {
+        final pid =
+            context.read<MongoProjectProvider>().currentProject?.projectId;
+
+        if (pid == null || pid.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Please select a project first")),
           );
-        },
-        icon: const Icon(Icons.timeline_rounded),
-        label: const Text(
-          'Phase Wise Duration',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color.fromARGB(255, 231, 80, 29),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+          return;
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PhaseWiseDurationScreen(pid: pid),
           ),
-          elevation: 5,
-        ),
+        );
+      },
+      icon: const Icon(Icons.timeline_rounded),
+      label: const Text(
+        'Phase Wise Duration',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
       ),
-    );
-  }
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color.fromARGB(255, 231, 80, 29),
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        elevation: 5,
+      ),
+    ),
+  );
+}
 }
