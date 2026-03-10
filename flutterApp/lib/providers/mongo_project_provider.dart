@@ -17,6 +17,7 @@ import '../models/project/qc_model.dart';
 import '../models/project/safety_model.dart';
 import '../models/project/audit_model.dart';
 import '../services/mongo_api_service.dart';
+import '../models/phase_duration_model.dart';
 
 class MongoProjectProvider extends ChangeNotifier {
   final MongoApiService _api = MongoApiService();
@@ -61,6 +62,7 @@ class MongoProjectProvider extends ChangeNotifier {
   List<Permit> permits = [];
   List<Incident> incidents = [];
   List<AuditLog> auditLog = [];
+  List<PhaseDurationModel> phaseDurations = [];
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
   void _setToken(String token) => _api.saveToken(token);
@@ -84,6 +86,29 @@ class MongoProjectProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('MongoProjectProvider.listenProjects error: $e');
+    }
+  }
+
+  // Ensure current project context exists (without loading all subcollections).
+  Future<void> ensureCurrentProject(String projectId) async {
+    if ((_currentProject?.projectId ?? '') == projectId) return;
+
+    try {
+      await _api.loadToken();
+      final raw = await _api.getProject(projectId);
+      _currentProject = ProjectModel.fromMap(
+        raw['projectId'] ?? raw['_id'] ?? projectId,
+        Map<String, dynamic>.from(raw),
+      );
+      notifyListeners();
+      return;
+    } catch (_) {
+      // Fallback to already loaded project list if direct fetch fails.
+      final idx = projects.indexWhere((p) => p.projectId == projectId);
+      if (idx >= 0) {
+        _currentProject = projects[idx];
+        notifyListeners();
+      }
     }
   }
 
@@ -132,6 +157,8 @@ class MongoProjectProvider extends ChangeNotifier {
         _loadSub(projectId, 'toolbox_meetings'),     // 26
         _loadSub(projectId, 'permits'),              // 27
         _loadSub(projectId, 'audit_logs'),           // 28
+        _api.getPhaseDurations(projectId),           
+
       ]);
 
       materials         = _parse(futures[0],  (d) => MaterialModel.fromMap(d));
@@ -164,6 +191,12 @@ class MongoProjectProvider extends ChangeNotifier {
       permits           = _parse(futures[27], (d) => Permit.fromMap(d));
       auditLog          = _parse(futures[28], (d) => AuditLog.fromMap(d));
 
+      // parse phase durations list
+      final rawPhases = (futures[29] as List<dynamic>);
+      phaseDurations = rawPhases
+          .map((e) => PhaseDurationModel.fromMap(Map<String, dynamic>.from(e)))
+          .toList();
+
       _loading = false;
       notifyListeners();
     } catch (e) {
@@ -171,6 +204,73 @@ class MongoProjectProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  // reload phase durations only (useful when PhaseWise screen opens)
+  Future<void> refreshPhaseDurations() async {
+    final pid = _currentProject?.projectId;
+    if (pid == null || pid.isEmpty) return;
+
+    try {
+      await _api.loadToken();
+      final raw = await _api.getPhaseDurations(pid);
+      phaseDurations = raw
+          .map((e) => PhaseDurationModel.fromMap(Map<String, dynamic>.from(e)))
+          .toList();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('MongoProjectProvider.refreshPhaseDurations error: $e');
+    }
+  }
+
+  // save (upsert) one phase duration to backend + update local list
+  Future<void> savePhaseDuration({
+    required String phaseId,
+    required String phaseName,
+    required int durationDays,
+    required int laborCount,
+  }) async {
+    final pid = _currentProject?.projectId;
+    if (pid == null || pid.isEmpty) {
+      throw Exception('No project selected (pid is null)');
+    }
+
+    await _api.loadToken();
+
+    final payload = {
+      'pid': pid,
+      'phaseId': phaseId,
+      'phaseName': phaseName,
+      'durationDays': durationDays,
+      'laborCount': laborCount,
+    };
+
+    await _api.loadToken();
+    await _api.savePhaseDuration(
+      pid: pid,
+      phaseId: phaseId,
+      phaseName: phaseName,
+      durationDays: durationDays,
+      laborCount: laborCount,
+    );
+
+    // Update local cache (upsert by phaseId)
+    final idx = phaseDurations.indexWhere((p) => p.phaseId == phaseId);
+    final updated = PhaseDurationModel(
+      pid: pid,
+      phaseId: phaseId,
+      phaseName: phaseName,
+      durationDays: durationDays,
+      laborCount: laborCount,
+    );
+
+    if (idx >= 0) {
+      phaseDurations[idx] = updated;
+    } else {
+      phaseDurations.add(updated);
+    }
+
+    notifyListeners();
   }
 
   // ─── Delete project ──────────────────────────────────────────────────────
@@ -196,6 +296,10 @@ class MongoProjectProvider extends ChangeNotifier {
     progressUpdates = []; ipcs = [];
     qcChecklists = []; ncrs = [];
     toolboxMeetings = []; permits = []; incidents = []; auditLog = [];
+
+    // phase
+    phaseDurations = [];
+
     notifyListeners();
   }
 
