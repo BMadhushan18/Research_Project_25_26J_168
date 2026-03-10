@@ -1,13 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/mongo_project_provider.dart';
 import '../../../services/mongo_api_service.dart';
+import '../../../utils/constants.dart';
 
-// ─── Entry point ─────────────────────────────────────────────────────────────
+//  Entry point 
 
 class OverviewTab extends StatefulWidget {
-  /// Called when user taps Materials (tabIndex=1) or BOQ (tabIndex=3).
-  /// For Materials, [roomLabel] and [roomData] carry the selected room context.
   final void Function(int tabIndex,
       {String? roomLabel, Map<String, dynamic>? roomData})? onNavigateToTab;
   const OverviewTab({super.key, this.onNavigateToTab});
@@ -18,13 +17,10 @@ class OverviewTab extends StatefulWidget {
 
 class _OverviewTabState extends State<OverviewTab> {
   Map<String, dynamic>? _structure;
+  Map<String, dynamic>? _wallingData;
+  Map<String, dynamic>? _sfData;
   bool _loading = false;
   String? _error;
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
 
   @override
   void initState() {
@@ -33,15 +29,27 @@ class _OverviewTabState extends State<OverviewTab> {
   }
 
   Future<void> _fetchStructure() async {
-    final pid =
-        Provider.of<ProjectProvider>(context, listen: false).currentProject?.projectId;
+    final pid = Provider.of<ProjectProvider>(context, listen: false)
+        .currentProject
+        ?.projectId;
     if (pid == null || pid.isEmpty) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final api = MongoApiService();
       await api.loadToken();
-      final result = await api.getBuildingStructure(pid);
-      setState(() => _structure = result.isEmpty ? null : result);
+      final results = await Future.wait([
+        api.getBuildingStructure(pid),
+        api.getWalling(pid),
+        api.getStructuralFrame(pid),
+      ]);
+      setState(() {
+        _structure   = results[0].isEmpty ? null : results[0];
+        _wallingData = results[1].isEmpty ? null : results[1];
+        _sfData      = results[2].isEmpty ? null : results[2];
+      });
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -51,448 +59,187 @@ class _OverviewTabState extends State<OverviewTab> {
 
   @override
   Widget build(BuildContext context) {
-    final pp = context.watch<ProjectProvider>();
-    final p = pp.currentProject;
+    final p = context.watch<ProjectProvider>().currentProject;
     if (p == null) return const Center(child: Text('No project selected'));
 
     return RefreshIndicator(
       onRefresh: _fetchStructure,
-      child: ListView(
-        padding: const EdgeInsets.all(14),
-        children: [
-          // ── Building Structure ──────────────────────────────────────────
-          _SectionHeader('Building Structure', Icons.foundation),
-          const SizedBox(height: 10),
-
-          if (_loading)
-            const Center(
-                child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator()))
-          else if (_error != null)
-            _ErrorCard(_error!, onRetry: _fetchStructure)
-          else if (_structure == null)
-            _NoStructureCard(projectId: p.projectId, onUploaded: _fetchStructure)
-          else
-            _BuildingStructureView(
-              data: _structure!,
-              onNavigateToTab: widget.onNavigateToTab,
-            ),
-
-          const SizedBox(height: 24),
-        ],
-      ),
+      child: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _ErrorView(_error!, onRetry: _fetchStructure)
+              : _structure == null && _wallingData == null
+                  ? _NoDataView(onRetry: _fetchStructure)
+                  : _OverviewBody(
+                      data: _structure ?? {},
+                      wallingData: _wallingData,
+                      sfData: _sfData,
+                    ),
     );
   }
 }
 
-// ─── Building Structure renderer ─────────────────────────────────────────────
+//  Main body 
 
-class _BuildingStructureView extends StatelessWidget {
+class _OverviewBody extends StatefulWidget {
   final Map<String, dynamic> data;
-  final void Function(int, {String? roomLabel, Map<String, dynamic>? roomData})? onNavigateToTab;
-  const _BuildingStructureView({required this.data, this.onNavigateToTab});
+  final Map<String, dynamic>? wallingData;
+  final Map<String, dynamic>? sfData;
+  const _OverviewBody({
+    required this.data,
+    this.wallingData,
+    this.sfData,
+  });
+
+  @override
+  State<_OverviewBody> createState() => _OverviewBodyState();
+}
+
+class _OverviewBodyState extends State<_OverviewBody> {
+  bool _foundationExpanded = false;
+  bool _wallingExpanded = false;
+  bool _sfExpanded = false;
+  String _selectedFloor = 'Ground Floor';
 
   Map<String, dynamic>? _map(dynamic v) =>
       v is Map<String, dynamic> ? v : null;
 
-  List<dynamic> _list(dynamic v) => v is List ? v : [];
-
-  String _fmt(dynamic v, {String units = ''}) {
-    if (v == null) return '—';
+  String _fmt(dynamic v) {
+    if (v == null) return '';
     final s = v.toString().trim();
-    if (s.isEmpty || s == 'null') return '—';
-    return units.isNotEmpty ? '$s $units' : s;
+    return (s.isEmpty || s == 'null') ? '' : s;
   }
 
   @override
   Widget build(BuildContext context) {
-    // The backend wraps the Gemini JSON inside a `data` key
-    final raw = _map(data['data']) ?? data;
+    final raw = _map(widget.data['data']) ?? widget.data;
+    final output = _map(raw['output']);
 
-    final output  = _map(raw['output']);
-    final levels  = _map(raw['levels']);
-    final floors  = _map(raw['floors']);
-    final catalog = _map(raw['openingsCatalog']);
-    final ratios  = _map(raw['ratios']);
-    final warnings = _list(raw['extractionWarnings']);
-    final units   = output?['units']?.toString() ?? '';
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // ── Output info ──────────────────────────────────────────────────
-      if (output != null) ...[
-        _SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _CardHeader(Icons.info_outline, 'Plan Info'),
-          const SizedBox(height: 8),
-          _KVTable([
-            ['Units', _fmt(output['units'])],
-            ['Scale', _fmt(output['scaleText'])],
-            ['Floor Area (reported)', _fmt(output['floorAreaReported'])],
-          ]),
-          if (_list(output['notes']).isNotEmpty)
-            _NoteChips(_list(output['notes'])),
-        ])),
-        const SizedBox(height: 10),
-      ],
-
-      // ── Ratios ───────────────────────────────────────────────────────
-      if (ratios != null &&
-          (ratios['concreteMix'] != null ||
-           ratios['mortarMix']   != null ||
-           ratios['plasterMix']  != null)) ...[
-        _SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _CardHeader(Icons.science_outlined, 'Mix Ratios'),
-          const SizedBox(height: 8),
-          _KVTable([
-            ['Concrete Mix', _fmt(ratios['concreteMix'])],
-            ['Mortar Mix',   _fmt(ratios['mortarMix'])],
-            ['Plaster Mix',  _fmt(ratios['plasterMix'])],
-          ]),
-        ])),
-        const SizedBox(height: 10),
-      ],
-
-      // ── Levels ───────────────────────────────────────────────────────
-      if (levels != null) ...[
-        _SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _CardHeader(Icons.layers_outlined, 'Level Measurements'),
-          const SizedBox(height: 10),
-          if (_map(levels['groundFloor']) != null)
-            _LevelTable('Ground Floor', _map(levels['groundFloor'])!, units),
-          if (_map(levels['upperFloor']) != null) ...[
-            const SizedBox(height: 10),
-            _LevelTable('Upper Floor', _map(levels['upperFloor'])!, units),
-          ],
-        ])),
-        const SizedBox(height: 10),
-      ],
-
-      // ── Openings catalog ─────────────────────────────────────────────
-      if (catalog != null) ...[
-        _SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _CardHeader(Icons.door_front_door_outlined, 'Openings Catalogue'),
-          const SizedBox(height: 8),
-          if (_list(catalog['doors']).isNotEmpty)
-            _OpeningCatalogTable('Doors', _list(catalog['doors']), units),
-          if (_list(catalog['windows']).isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _OpeningCatalogTable('Windows', _list(catalog['windows']), units),
-          ],
-          if (_list(catalog['frenchWindows']).isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _OpeningCatalogTable('French Windows', _list(catalog['frenchWindows']), units),
-          ],
-          if (_list(catalog['fanlights']).isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _OpeningCatalogTable('Fanlights', _list(catalog['fanlights']), units),
-          ],
-        ])),
-        const SizedBox(height: 10),
-      ],
-
-      // ── Floor spaces ─────────────────────────────────────────────────
-      if (floors != null) ...[
-        _FloorSpaces(
-          floorKey: 'groundFloor',
-          label: 'Ground Floor Spaces',
-          floors: floors,
-          units: units,
-          onNavigateToTab: onNavigateToTab,
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        //  Plan Info 
+        _PlanInfoCard(
+          scale: _fmt(output?['scaleText']),
+          units: _fmt(output?['units']),
+          floorArea: _fmt(output?['floorAreaReported']),
         ),
-        if (_map(floors['upperFloor'])?['enabled'] == true ||
-            (_map(_map(floors['upperFloor'])?['spaces'])?.isNotEmpty ?? false)) ...[
-          const SizedBox(height: 10),
-          _FloorSpaces(
-            floorKey: 'upperFloor',
-            label: 'Upper Floor Spaces',
-            floors: floors,
-            units: units,
-            onNavigateToTab: onNavigateToTab,
+        const SizedBox(height: 20),
+
+        //  Section heading 
+        const Text(
+          'Building Components',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A237E),
           ),
-        ],
-      ],
-
-      // ── Extraction warnings ──────────────────────────────────────────
-      if (warnings.isNotEmpty) ...[
-        const SizedBox(height: 10),
-        _WarningsCard(warnings),
-      ],
-    ]);
-  }
-}
-
-// ─── Floor spaces section ─────────────────────────────────────────────────────
-
-class _FloorSpaces extends StatefulWidget {
-  final String floorKey;
-  final String label;
-  final Map<String, dynamic> floors;
-  final String units;
-  final void Function(int, {String? roomLabel, Map<String, dynamic>? roomData})? onNavigateToTab;
-
-  const _FloorSpaces({
-    required this.floorKey,
-    required this.label,
-    required this.floors,
-    required this.units,
-    this.onNavigateToTab,
-  });
-
-  @override
-  State<_FloorSpaces> createState() => _FloorSpacesState();
-}
-
-class _FloorSpacesState extends State<_FloorSpaces> {
-  String? _selectedKey;
-
-  Map<String, dynamic>? _map(dynamic v) =>
-      v is Map<String, dynamic> ? v : null;
-
-  String _fmt(dynamic v) {
-    if (v == null) return '—';
-    final s = v.toString().trim();
-    return (s.isEmpty || s == 'null') ? '—' : s;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final floorData = _map(widget.floors[widget.floorKey]);
-    final spacesRaw = _map(floorData?['spaces']);
-    if (spacesRaw == null || spacesRaw.isEmpty) return const SizedBox.shrink();
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _SectionHeader(widget.label, Icons.home_outlined),
-      const SizedBox(height: 8),
-      _SectionCard(
-        child: Column(
-          children: spacesRaw.entries.map((entry) {
-            final room    = _map(entry.value);
-            final lbl     = _fmt(room?['labelText'] ?? entry.key);
-            final area    = room?['floor'] is Map ? room!['floor']['area'] : null;
-            final areaStr = area != null && area.toString() != 'null'
-                ? 'Area: $area ${widget.units}²'
-                : '';
-            final isLast     = entry.key == spacesRaw.keys.last;
-            final isSelected = _selectedKey == entry.key;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                  child: Row(children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1565C0).withAlpha(18),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: const Icon(Icons.meeting_room_outlined,
-                          size: 16, color: Color(0xFF1565C0)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(lbl,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 13)),
-                          if (areaStr.isNotEmpty)
-                            Text(areaStr,
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey[600])),
-                        ],
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        if (room != null) {
-                          setState(() {
-                            _selectedKey = isSelected ? null : entry.key;
-                          });
-                        }
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: isSelected
-                            ? Colors.grey[600]
-                            : const Color(0xFF1565C0),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 6),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: Text(isSelected ? 'Close' : 'View',
-                          style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w600)),
-                    ),
-                  ]),
-                ),
-                // ── Inline room detail panel ──────────────────────────
-                if (isSelected && room != null) ...[  
-                  _RoomDetailPanel(
-                    label:    lbl,
-                    roomData: room,
-                    units:    widget.units,
-                    onClose:  () => setState(() => _selectedKey = null),
-                    onMaterials: () => widget.onNavigateToTab?.call(
-                        1, roomLabel: lbl, roomData: room),
-                    onBoq:       () => widget.onNavigateToTab?.call(3),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                if (!isLast && !isSelected) const Divider(height: 1),
-              ],
-            );
-          }).toList(),
         ),
-      ),
-    ]);
+        const SizedBox(height: 12),
+
+        //  Foundation 
+        _ExpandableSection(
+          icon: Icons.foundation,
+          label: 'Foundation',
+          color: const Color(0xFF4E342E),
+          isExpanded: _foundationExpanded,
+          onToggle: () =>
+              setState(() => _foundationExpanded = !_foundationExpanded),
+          child: _FoundationContent(raw: raw),
+        ),
+        const SizedBox(height: 10),
+
+        //  Floor selector 
+        _FloorSelector(
+          selected: _selectedFloor,
+          onChanged: (v) => setState(() => _selectedFloor = v),
+        ),
+        const SizedBox(height: 10),
+
+        //  Walling 
+        _ExpandableSection(
+          icon: Icons.crop_square_outlined,
+          label: 'Walling',
+          color: const Color(0xFF2E7D32),
+          isExpanded: _wallingExpanded,
+          onToggle: () => setState(() => _wallingExpanded = !_wallingExpanded),
+          child: _WallingContent(
+            raw: raw,
+            floor: _selectedFloor,
+            wallingData: widget.wallingData,
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        //  Structural Frame 
+        _ExpandableSection(
+          icon: Icons.account_tree_outlined,
+          label: 'Structural Frame',
+          color: const Color(0xFF1565C0),
+          isExpanded: _sfExpanded,
+          onToggle: () => setState(() => _sfExpanded = !_sfExpanded),
+          child: _SFContent(sfData: widget.sfData),
+        ),
+        const SizedBox(height: 10),
+
+                const SizedBox(height: 24),
+      ],
+    );
   }
 }
 
-// ─── Room detail panel (shown at top when View is tapped) ─────────────────────
+//  Plan Info Card 
 
-class _RoomDetailPanel extends StatelessWidget {
-  final String label;
-  final Map<String, dynamic> roomData;
+class _PlanInfoCard extends StatelessWidget {
+  final String scale;
   final String units;
-  final VoidCallback onClose;
-  final VoidCallback? onMaterials;
-  final VoidCallback? onBoq;
-
-  const _RoomDetailPanel({
-    required this.label,
-    required this.roomData,
-    required this.units,
-    required this.onClose,
-    this.onMaterials,
-    this.onBoq,
-  });
-
-  Map<String, dynamic>? _map(dynamic v) =>
-      v is Map<String, dynamic> ? v : null;
-
-  String _fmt(dynamic v) {
-    if (v == null) return '—';
-    final s = v.toString().trim();
-    return (s.isEmpty || s == 'null') ? '—' : s;
-  }
+  final String floorArea;
+  const _PlanInfoCard(
+      {required this.scale, required this.units, required this.floorArea});
 
   @override
   Widget build(BuildContext context) {
-    final floor    = _map(roomData['floor']);
-    final walls    = _map(roomData['walls']);
-    final openings = _map(roomData['openings']);
-    final u        = units;
-
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF1565C0).withAlpha(60), width: 1.5),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1A237E), Color(0xFF1565C0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: const Color(0xFF1565C0).withAlpha(18),
-              blurRadius: 12,
-              offset: const Offset(0, 3)),
+            color: const Color(0xFF1565C0).withAlpha(60),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header ───────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1565C0),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
-            ),
-            child: Row(children: [
-              const Icon(Icons.meeting_room_outlined, size: 18, color: Colors.white),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15)),
+          const Row(children: [
+            Icon(Icons.map_outlined, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Plan Info',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
-              GestureDetector(
-                onTap: onClose,
-                child: const Icon(Icons.close, color: Colors.white70, size: 20),
-              ),
-            ]),
-          ),
-
-          // ── Body ─────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Floor dimensions
-                if (floor != null) ...[
-                  _SubHeader('Floor Dimensions'),
-                  _KVTable([
-                    ['Length', _fmt(floor['length']) == '—' ? '—' : '${_fmt(floor['length'])} $u'],
-                    ['Width',  _fmt(floor['width'])  == '—' ? '—' : '${_fmt(floor['width'])} $u'],
-                    ['Area',   _fmt(floor['area'])   == '—' ? '—' : '${_fmt(floor['area'])} ${u}²'],
-                  ]),
-                  const SizedBox(height: 12),
-                ],
-                // Walls
-                if (walls != null && walls.isNotEmpty) ...[
-                  _SubHeader('Walls'),
-                  _WallsTable(walls, u),
-                  const SizedBox(height: 12),
-                ],
-                // Openings
-                if (openings != null) ...[
-                  _OpeningsSection(openings, u),
-                  const SizedBox(height: 12),
-                ],
-                // ── Action buttons ───────────────────────────────────
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onMaterials,
-                      icon: const Icon(Icons.inventory_2_outlined, size: 16),
-                      label: const Text('Materials',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.green.shade700,
-                        side: BorderSide(color: Colors.green.shade400),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onBoq,
-                      icon: const Icon(Icons.format_list_numbered, size: 16),
-                      label: const Text('BOQ',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orange.shade700,
-                        side: BorderSide(color: Colors.orange.shade400),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ),
-                ]),
-              ],
             ),
+          ]),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _PlanInfoChip(label: 'Scale', value: scale),
+              const SizedBox(width: 10),
+              _PlanInfoChip(label: 'Units', value: units),
+              const SizedBox(width: 10),
+              _PlanInfoChip(label: 'Floor Area', value: floorArea),
+            ],
           ),
         ],
       ),
@@ -500,96 +247,260 @@ class _RoomDetailPanel extends StatelessWidget {
   }
 }
 
-// ─── Walls compact table ──────────────────────────────────────────────────────
+class _PlanInfoChip extends StatelessWidget {
+  final String label;
+  final String value;
+  const _PlanInfoChip({required this.label, required this.value});
 
-class _WallsTable extends StatelessWidget {
-  final Map<String, dynamic> walls;
-  final String units;
-  const _WallsTable(this.walls, this.units);
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(30),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withAlpha(60)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+//  Floor Selector 
+
+class _FloorSelector extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onChanged;
+  const _FloorSelector({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: ['Ground Floor', 'First Floor'].map((floor) {
+          final isSelected = selected == floor;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(floor),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withAlpha(40),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  floor,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected ? Colors.white : Colors.grey.shade600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+//  Expandable Section 
+
+class _ExpandableSection extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isExpanded;
+  final VoidCallback onToggle;
+  final Widget child;
+
+  const _ExpandableSection({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isExpanded,
+    required this.onToggle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 20, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.keyboard_arrow_down,
+                        color: color, size: 22),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: isExpanded
+                ? Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                          top: BorderSide(color: Colors.grey.shade200)),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: child,
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+//  Foundation Content 
+
+class _FoundationContent extends StatelessWidget {
+  final Map<String, dynamic> raw;
+  const _FoundationContent({required this.raw});
+
+  Map<String, dynamic>? _map(dynamic v) =>
+      v is Map<String, dynamic> ? v : null;
 
   String _fmt(dynamic v) {
-    if (v == null) return '—';
+    if (v == null) return '';
     final s = v.toString().trim();
-    return (s.isEmpty || s == 'null') ? '—' : s;
+    return (s.isEmpty || s == 'null') ? '' : s;
   }
 
   @override
   Widget build(BuildContext context) {
-    final rows = walls.entries.toList();
-    return Table(
-      columnWidths: const {
-        0: IntrinsicColumnWidth(),
-        1: FlexColumnWidth(),
-        2: FlexColumnWidth(),
-        3: FlexColumnWidth(),
-      },
-      border: TableBorder.all(
-          color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8)),
+    final levels = _map(raw['levels']);
+    final groundLevel = _map(levels?['groundFloor']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TableRow(
-          decoration: BoxDecoration(color: Colors.grey.shade100),
-          children: [
-            _TH('Wall'),
-            _TH('Length ($units)'),
-            _TH('Thick ($units)'),
-            _TH('Adjacent To'),
-          ],
-        ),
-        ...rows.map((e) {
-          final w = e.value is Map<String, dynamic>
-              ? e.value as Map<String, dynamic>
-              : <String, dynamic>{};
-          return TableRow(children: [
-            _TD(e.key, bold: true),
-            _TD(_fmt(w['length'])),
-            _TD(_fmt(w['thickness'])),
-            _TD(_fmt(w['adjacentTo'])),
-          ]);
-        }),
+        if (groundLevel != null) ...[
+          _KVRow('Plinth Height', _fmt(groundLevel['plinthHeight'])),
+          _KVRow('Clear Height', _fmt(groundLevel['clearHeight'])),
+          _KVRow('Slab Thickness', _fmt(groundLevel['slabThickness'])),
+        ],
+        const _PlaceholderNote(
+            'Foundation details will appear here once extracted from the plan.'),
       ],
     );
   }
 }
 
-// ─── Openings for a room ──────────────────────────────────────────────────────
+//  Walling Content
 
-class _OpeningsSection extends StatelessWidget {
-  final Map<String, dynamic> openings;
-  final String units;
-  const _OpeningsSection(this.openings, this.units);
-
-  List<dynamic> _list(dynamic v) => v is List ? v : [];
+class _WallingContent extends StatefulWidget {
+  final Map<String, dynamic> raw;
+  final String floor;
+  final Map<String, dynamic>? wallingData;
+  const _WallingContent({
+    required this.raw,
+    required this.floor,
+    this.wallingData,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final doors   = _list(openings['doors']);
-    final windows = _list(openings['windows']);
-    final french  = _list(openings['frenchWindows']);
-    final fans    = _list(openings['fanlights']);
-    if (doors.isEmpty && windows.isEmpty && french.isEmpty && fans.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _SubHeader('Openings'),
-      if (doors.isNotEmpty)
-        _OpeningRows('Doors',          doors,   Icons.door_front_door_outlined, Colors.brown,  units),
-      if (windows.isNotEmpty)
-        _OpeningRows('Windows',        windows, Icons.window_outlined,          Colors.blue,   units),
-      if (french.isNotEmpty)
-        _OpeningRows('French Windows', french,  Icons.balcony_outlined,         Colors.teal,   units),
-      if (fans.isNotEmpty)
-        _OpeningRows('Fanlights',      fans,    Icons.light_outlined,           Colors.amber,  units),
-    ]);
-  }
+  State<_WallingContent> createState() => _WallingContentState();
 }
 
-class _OpeningRows extends StatelessWidget {
-  final String label;
-  final List<dynamic> items;
-  final IconData icon;
-  final Color color;
-  final String units;
-  const _OpeningRows(this.label, this.items, this.icon, this.color, this.units);
+class _WallingContentState extends State<_WallingContent> {
+  // wall key -> user-selected width override
+  final Map<String, String> _widthOverrides = {};
+
+  static const _brickSizes = [
+    {'label': '115 mm  (Half brick — default)', 'value': '0.1150 m'},
+    {'label': '230 mm  (Full brick)', 'value': '0.2300 m'},
+    {'label': '102 mm  (4")', 'value': '0.1020 m'},
+    {'label': '275 mm  (Cavity wall)', 'value': '0.2750 m'},
+    {'label': '340 mm  (1.5 brick)', 'value': '0.3400 m'},
+  ];
+
+  Map<String, dynamic>? _map(dynamic v) =>
+      v is Map<String, dynamic> ? v : null;
 
   String _fmt(dynamic v) {
     if (v == null) return '—';
@@ -597,459 +508,775 @@ class _OpeningRows extends StatelessWidget {
     return (s.isEmpty || s == 'null') ? '—' : s;
   }
 
+  /// Returns the width to display: override > stored > default 115 mm
+  String _wallWidth(String key, dynamic raw) {
+    if (_widthOverrides.containsKey(key)) return _widthOverrides[key]!;
+    final v = _fmt(raw);
+    return (v == '—') ? '0.1150 m' : v;
+  }
+
+  void _pickBrickWidth(BuildContext ctx, String wallKey, String current) {
+    showModalBottomSheet(
+      context: ctx,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _SizePickerSheet(
+        title: 'Select Wall Width  ($wallKey)',
+        items: _brickSizes.map((s) => s['label']!).toList(),
+        currentValue: current,
+        onSelect: (idx) =>
+            setState(() => _widthOverrides[wallKey] = _brickSizes[idx]['value']!),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-        ]),
-      ),
-      Table(
-        columnWidths: const {
-          0: IntrinsicColumnWidth(),
-          1: FlexColumnWidth(),
-          2: FlexColumnWidth(),
-          3: FlexColumnWidth(),
-        },
-        border: TableBorder.all(
-            color: Colors.grey.shade200, borderRadius: BorderRadius.circular(6)),
-        children: [
-          TableRow(
-            decoration: BoxDecoration(color: Colors.grey.shade100),
-            children: [
-              _TH('ID'),
-              _TH('Code'),
-              _TH('W ($units)'),
-              _TH('H ($units)'),
-            ],
-          ),
-          ...items.map((item) {
-            final m = item is Map<String, dynamic> ? item : <String, dynamic>{};
-            return TableRow(children: [
-              _TD(_fmt(m['openingId']), bold: true),
-              _TD(_fmt(m['typeCode'])),
-              _TD(_fmt(m['width'])),
-              _TD(_fmt(m['height'])),
-            ]);
-          }),
+    final isGround = widget.floor == 'Ground Floor';
+
+    final wRaw = widget.wallingData != null
+        ? (_map(widget.wallingData!['data']) ?? widget.wallingData!)
+        : null;
+    final fallbackRaw = _map(widget.raw['data']) ?? widget.raw;
+
+    final wOutput = _map(wRaw?['output']);
+    final totalWallsVal = wOutput?['totalWalls'];
+    final units = _fmt(wOutput?['units']);
+
+    final groundFloorW = _map(wRaw?['groundFloor']);
+    final wallsW = _map(groundFloorW?['walls']);
+
+    final groundFloorFb = _map(fallbackRaw['groundFloor']);
+    final wallsFb = _map(groundFloorFb?['walls']);
+
+    final walls = isGround ? (wallsW ?? wallsFb) : null;
+    final totalWalls =
+        totalWallsVal?.toString() ?? walls?.length.toString() ?? '—';
+
+    final doors = _map(wRaw?['doors']);
+    final windows = _map(wRaw?['windows']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FloorBadge(widget.floor),
+        if (!isGround) ...[
+          const SizedBox(height: 12),
+          const _PlaceholderNote(
+              'First floor walling data will appear here once extracted.'),
         ],
-      ),
-      const SizedBox(height: 6),
-    ]);
-  }
-}
-
-// ─── Level measurements table ─────────────────────────────────────────────────
-
-class _LevelTable extends StatelessWidget {
-  final String label;
-  final Map<String, dynamic> level;
-  final String units;
-  const _LevelTable(this.label, this.level, this.units);
-
-  String _fmt(dynamic v) {
-    if (v == null) return '—';
-    final s = v.toString().trim();
-    return (s.isEmpty || s == 'null') ? '—' : s;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final u = units.isNotEmpty ? ' ($units)' : '';
-    final rows = <List<String>>[
-      if (level['plinthHeight'] != null)
-        ['Plinth Height$u', _fmt(level['plinthHeight'])],
-      ['Clear Height$u',    _fmt(level['clearHeight'])],
-      ['Slab Thickness$u',  _fmt(level['slabThickness'])],
-      ['Beam Depth$u',      _fmt(level['beamDepth'])],
-      ['Beam Width$u',      _fmt(level['beamWidth'])],
-      if (level['lintelLevel'] != null)
-        ['Lintel Level$u',  _fmt(level['lintelLevel'])],
-      if (level['defaultWindowSillHeight'] != null)
-        ['Window Sill$u',   _fmt(level['defaultWindowSillHeight'])],
-      if (level['defaultWindowHeadHeight'] != null)
-        ['Window Head$u',   _fmt(level['defaultWindowHeadHeight'])],
-    ];
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-      const SizedBox(height: 6),
-      _KVTable(rows),
-    ]);
-  }
-}
-
-// ─── Catalogue table ──────────────────────────────────────────────────────────
-
-class _OpeningCatalogTable extends StatelessWidget {
-  final String label;
-  final List<dynamic> items;
-  final String units;
-  const _OpeningCatalogTable(this.label, this.items, this.units);
-
-  String _fmt(dynamic v) {
-    if (v == null) return '—';
-    final s = v.toString().trim();
-    return (s.isEmpty || s == 'null') ? '—' : s;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-      const SizedBox(height: 4),
-      Table(
-        columnWidths: const {
-          0: IntrinsicColumnWidth(),
-          1: FlexColumnWidth(),
-          2: FlexColumnWidth(),
-          3: FlexColumnWidth(),
-        },
-        border: TableBorder.all(
-            color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8)),
-        children: [
-          TableRow(
-            decoration: BoxDecoration(color: Colors.grey.shade100),
-            children: [
-              _TH('Code'),
-              _TH('Type'),
-              _TH('W (${units.isNotEmpty ? units : "—"})'),
-              _TH('H (${units.isNotEmpty ? units : "—"})'),
-            ],
-          ),
-          ...items.map((item) {
-            final m = item is Map<String, dynamic> ? item : <String, dynamic>{};
-            return TableRow(children: [
-              _TD(_fmt(m['typeCode'] ?? m['code']), bold: true),
-              _TD(_fmt(m['type'] ?? m['description'] ?? '—')),
-              _TD(_fmt(m['width'])),
-              _TD(_fmt(m['height'])),
-            ]);
-          }),
-        ],
-      ),
-    ]);
-  }
-}
-
-// ─── Warnings card ────────────────────────────────────────────────────────────
-
-class _WarningsCard extends StatefulWidget {
-  final List<dynamic> warnings;
-  const _WarningsCard(this.warnings);
-
-  @override
-  State<_WarningsCard> createState() => _WarningsCardState();
-}
-
-class _WarningsCardState extends State<_WarningsCard> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.orange.shade50,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => setState(() => _expanded = !_expanded),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Icon(Icons.warning_amber_rounded,
-                  color: Colors.orange.shade700, size: 18),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Extraction Warnings (${widget.warnings.length})',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange.shade800,
-                      fontSize: 13),
-                ),
+        if (isGround) ...[
+          const SizedBox(height: 12),
+          // Summary bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32).withAlpha(12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF2E7D32).withAlpha(40)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.crop_square_outlined,
+                  size: 16, color: Color(0xFF2E7D32)),
+              const SizedBox(width: 8),
+              Text(
+                'Total Walls: $totalWalls',
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2E7D32)),
               ),
-              Icon(_expanded
-                  ? Icons.keyboard_arrow_up
-                  : Icons.keyboard_arrow_down,
-                  color: Colors.orange.shade700),
+              if (units.isNotEmpty && units != '—') ...[
+                const Spacer(),
+                Text('Units: $units',
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              ],
             ]),
-            if (_expanded) ...[
-              const SizedBox(height: 8),
-              ...widget.warnings.map((w) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Walls (with tappable Width column) ──
+          const _SectionLabel('Walls',
+              icon: Icons.crop_square_outlined,
+              color: Color(0xFF2E7D32)),
+          const SizedBox(height: 6),
+          if (walls != null && walls.isNotEmpty)
+            _buildWallsTable(context, walls)
+          else
+            const _PlaceholderNote(
+                'No wall data found. Analyse a building plan to populate this section.'),
+          const SizedBox(height: 16),
+
+          // ── Door Schedule ──
+          const _SectionLabel('Door Schedule',
+              icon: Icons.door_front_door_outlined,
+              color: Color(0xFF5D4037)),
+          const SizedBox(height: 6),
+          if (doors != null && doors.isNotEmpty)
+            _MeasurementTable(
+              color: const Color(0xFF5D4037),
+              headers: const ['Door', 'Width', 'Height', 'Type', 'Qty'],
+              rows: doors.entries.map((e) {
+                final d = _map(e.value);
+                return [
+                  e.key,
+                  _fmt(d?['width']),
+                  _fmt(d?['height']),
+                  _fmt(d?['type']),
+                  _fmt(d?['quantity']),
+                ];
+              }).toList(),
+            )
+          else
+            const _PlaceholderNote('No door schedule found.'),
+          const SizedBox(height: 16),
+
+          // ── Window & FW Schedule ──
+          const _SectionLabel('Window & FW Schedule',
+              icon: Icons.window_outlined,
+              color: Color(0xFF00695C)),
+          const SizedBox(height: 6),
+          if (windows != null && windows.isNotEmpty)
+            _MeasurementTable(
+              color: const Color(0xFF00695C),
+              headers: const ['Mark', 'Width', 'Height', 'Type', 'Qty'],
+              rows: windows.entries.map((e) {
+                final w = _map(e.value);
+                return [
+                  e.key,
+                  _fmt(w?['width']),
+                  _fmt(w?['height']),
+                  _fmt(w?['type']),
+                  _fmt(w?['quantity']),
+                ];
+              }).toList(),
+            )
+          else
+            const _PlaceholderNote('No window / FW schedule found.'),
+        ],
+      ],
+    );
+  }
+
+  // Walls table with tappable width cells
+  Widget _buildWallsTable(BuildContext ctx, Map<String, dynamic> walls) {
+    const color = Color(0xFF2E7D32);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Table(
+        border: TableBorder.all(color: color.withAlpha(40), width: 1),
+        columnWidths: const {
+          0: FlexColumnWidth(1.4),
+          1: FlexColumnWidth(1.3),
+          2: FlexColumnWidth(1.0),
+          3: FlexColumnWidth(1.0),
+        },
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: color.withAlpha(30)),
+            children: ['Wall', 'Width \u270E', 'Length', 'Height']
+                .map((h) => _hCell(h, color))
+                .toList(),
+          ),
+          ...walls.entries.toList().asMap().entries.map((entry) {
+            final idx = entry.key;
+            final e = entry.value;
+            final w = e.value is Map<String, dynamic>
+                ? e.value as Map<String, dynamic>
+                : <String, dynamic>{};
+            final widthVal = _wallWidth(e.key, w['width']);
+            return TableRow(
+              decoration: BoxDecoration(
+                  color: idx.isEven ? Colors.white : color.withAlpha(8)),
+              children: [
+                _dCell(e.key, color),
+                // Tappable width cell
+                GestureDetector(
+                  onTap: () => _pickBrickWidth(ctx, e.key, widthVal),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 7),
+                    color: Colors.transparent,
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('• ',
-                            style: TextStyle(color: Colors.orange.shade700)),
-                        Expanded(
-                          child: Text(w.toString(),
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.orange.shade900)),
+                        Flexible(
+                          child: Text(
+                            widthVal,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF1565C0),
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
+                        const SizedBox(width: 3),
+                        const Icon(Icons.edit_outlined,
+                            size: 11, color: Color(0xFF1565C0)),
                       ],
                     ),
-                  )),
+                  ),
+                ),
+                _dCell(_fmt(w['length']), color),
+                _dCell(_fmt(w['height']), color),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _hCell(String t, Color c) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        child: Text(t,
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.bold, color: c),
+            textAlign: TextAlign.center),
+      );
+
+  Widget _dCell(String t, Color c) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        child: Text(t.isEmpty ? '—' : t,
+            style: const TextStyle(fontSize: 12, color: Colors.black87),
+            textAlign: TextAlign.center),
+      );
+}
+
+// ─── Measurement Table ──────────────────────────────────────────────────────
+
+class _MeasurementTable extends StatelessWidget {
+  final Color color;
+  final List<String> headers;
+  final List<List<String>> rows;
+
+  const _MeasurementTable({
+    required this.color,
+    required this.headers,
+    required this.rows,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Table(
+        border: TableBorder.all(color: color.withAlpha(40), width: 1),
+        columnWidths: {
+          0: const FlexColumnWidth(1.4),
+          for (int i = 1; i < headers.length; i++) i: const FlexColumnWidth(1),
+        },
+        children: [
+          // Header
+          TableRow(
+            decoration: BoxDecoration(color: color.withAlpha(30)),
+            children: headers
+                .map((h) => _cell(h, isHeader: true, color: color))
+                .toList(),
+          ),
+          // Data rows
+          ...rows.asMap().entries.map((entry) {
+            final even = entry.key.isEven;
+            return TableRow(
+              decoration: BoxDecoration(
+                color: even ? Colors.white : color.withAlpha(8),
+              ),
+              children: entry.value
+                  .map((v) => _cell(v.isEmpty ? '—' : v, color: color))
+                  .toList(),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _cell(String text, {bool isHeader = false, required Color color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: isHeader ? 11 : 12,
+          fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+          color: isHeader ? color : Colors.black87,
+        ),
+        textAlign: isHeader ? TextAlign.center : TextAlign.center,
+      ),
+    );
+  }
+}
+
+//  Structural Frame Content
+
+class _SFContent extends StatefulWidget {
+  final Map<String, dynamic>? sfData;
+  const _SFContent({this.sfData});
+
+  @override
+  State<_SFContent> createState() => _SFContentState();
+}
+
+class _SFContentState extends State<_SFContent> {
+  // column key -> {width, length} overrides
+  final Map<String, String> _widthOverrides = {};
+  final Map<String, String> _lengthOverrides = {};
+
+  // Standard square column sizes (width == length for each)
+  static const _columnSizes = [
+    {'label': '225 \u00d7 225 mm  (9\u2033 \u00d7 9\u2033 — default)', 'dim': '0.2250 m'},
+    {'label': '300 \u00d7 300 mm  (12\u2033 \u00d7 12\u2033)', 'dim': '0.3000 m'},
+    {'label': '375 \u00d7 375 mm  (15\u2033 \u00d7 15\u2033)', 'dim': '0.3750 m'},
+    {'label': '450 \u00d7 450 mm  (18\u2033 \u00d7 18\u2033)', 'dim': '0.4500 m'},
+    {'label': '600 \u00d7 600 mm  (24\u2033 \u00d7 24\u2033)', 'dim': '0.6000 m'},
+  ];
+
+  Map<String, dynamic>? _map(dynamic v) =>
+      v is Map<String, dynamic> ? v : null;
+
+  String _fmt(dynamic v) {
+    if (v == null) return '';
+    final s = v.toString().trim();
+    return (s.isEmpty || s == 'null') ? '' : s;
+  }
+
+  String _colDim(Map<String, String> overrides, String key, dynamic raw,
+      String defaultVal) {
+    if (overrides.containsKey(key)) return overrides[key]!;
+    final v = _fmt(raw);
+    return v.isEmpty ? defaultVal : v;
+  }
+
+  void _pickColumnSize(
+      BuildContext ctx, String colKey, String whichDim, String current) {
+    showModalBottomSheet(
+      context: ctx,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _SizePickerSheet(
+        title: 'Select Column $whichDim  ($colKey)',
+        items: _columnSizes.map((s) => s['label']!).toList(),
+        currentValue: current,
+        onSelect: (idx) {
+          final val = _columnSizes[idx]['dim']!;
+          setState(() {
+            if (whichDim == 'Width') {
+              _widthOverrides[colKey] = val;
+            } else {
+              _lengthOverrides[colKey] = val;
+            }
+          });
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.sfData == null) {
+      return const _PlaceholderNote(
+          'No structural frame data found. Analyse a building plan first.');
+    }
+
+    final raw = _map(widget.sfData!['data']) ?? widget.sfData!;
+    final output = _map(raw['output']);
+    final groundFloor = _map(raw['groundFloor']);
+    final columns = _map(groundFloor?['columns']);
+    final totalColumns =
+        output?['totalColumns']?.toString() ?? columns?.length.toString() ?? '—';
+    final units = _fmt(output?['units']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Summary
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1565C0).withAlpha(12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFF1565C0).withAlpha(40)),
+          ),
+          child: Row(children: [
+            const Icon(Icons.account_tree_outlined,
+                size: 16, color: Color(0xFF1565C0)),
+            const SizedBox(width: 8),
+            Text(
+              'Total Columns: $totalColumns',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1565C0)),
+            ),
+            if (units.isNotEmpty) ...[
+              const Spacer(),
+              Text('Units: $units',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             ],
           ]),
         ),
+        const SizedBox(height: 12),
+        if (columns != null && columns.isNotEmpty)
+          _buildColumnsTable(context, columns)
+        else
+          const _PlaceholderNote('No column data available.'),
+      ],
+    );
+  }
+
+  Widget _buildColumnsTable(
+      BuildContext ctx, Map<String, dynamic> columns) {
+    const color = Color(0xFF1565C0);
+    const defaultDim = '0.2250 m';
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Table(
+        border: TableBorder.all(color: color.withAlpha(40), width: 1),
+        columnWidths: const {
+          0: FlexColumnWidth(1.4),
+          1: FlexColumnWidth(1.3),
+          2: FlexColumnWidth(1.3),
+          3: FlexColumnWidth(1.0),
+        },
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: color.withAlpha(30)),
+            children: ['Column', 'Width \u270E', 'Length \u270E', 'Height']
+                .map((h) => _hCell(h, color))
+                .toList(),
+          ),
+          ...columns.entries.toList().asMap().entries.map((entry) {
+            final idx = entry.key;
+            final e = entry.value;
+            final c = e.value is Map<String, dynamic>
+                ? e.value as Map<String, dynamic>
+                : <String, dynamic>{};
+            final wVal = _colDim(_widthOverrides, e.key, c['width'], defaultDim);
+            final lVal = _colDim(_lengthOverrides, e.key, c['length'], defaultDim);
+            return TableRow(
+              decoration: BoxDecoration(
+                  color: idx.isEven ? Colors.white : color.withAlpha(8)),
+              children: [
+                _dCell(e.key, color),
+                // Tappable width
+                _tappableCell(
+                    wVal, () => _pickColumnSize(ctx, e.key, 'Width', wVal),
+                    color),
+                // Tappable length
+                _tappableCell(
+                    lVal, () => _pickColumnSize(ctx, e.key, 'Length', lVal),
+                    color),
+                _dCell(_fmt(c['height']), color),
+              ],
+            );
+          }),
+        ],
       ),
     );
   }
-}
 
-// ─── No structure card ────────────────────────────────────────────────────────
-
-class _NoStructureCard extends StatelessWidget {
-  final String projectId;
-  final VoidCallback onUploaded;
-  const _NoStructureCard({required this.projectId, required this.onUploaded});
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      child: Column(children: [
-        const Icon(Icons.architecture_outlined, size: 48, color: Color(0xFF1565C0)),
-        const SizedBox(height: 10),
-        const Text('No Building Structure Data',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-        const SizedBox(height: 6),
-        const Text(
-          'Upload building plan images to let Gemini extract a full '
-          'room-by-room structural breakdown.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-      ]),
-    );
-  }
-}
-
-// ─── Error card ───────────────────────────────────────────────────────────────
-
-class _ErrorCard extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-  const _ErrorCard(this.message, {required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      child: Column(children: [
-        const Icon(Icons.error_outline, size: 36, color: Colors.red),
-        const SizedBox(height: 8),
-        Text(message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, color: Colors.red)),
-        const SizedBox(height: 10),
-        TextButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry')),
-      ]),
-    );
-  }
-}
-
-// ─── Shared small widgets ─────────────────────────────────────────────────────
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  const _SectionHeader(this.title, this.icon);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      Icon(icon, size: 18, color: const Color(0xFF1565C0)),
-      const SizedBox(width: 6),
-      Text(title,
-          style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1565C0))),
-    ]);
-  }
-}
-
-class _CardHeader extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  const _CardHeader(this.icon, this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      Icon(icon, size: 16, color: const Color(0xFF1565C0)),
-      const SizedBox(width: 6),
-      Text(title,
-          style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Color(0xFF1565C0))),
-    ]);
-  }
-}
-
-class _SubHeader extends StatelessWidget {
-  final String title;
-  const _SubHeader(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Text(title,
-          style: const TextStyle(
-              fontWeight: FontWeight.w600, fontSize: 12, color: Colors.black87)),
-    );
-  }
-}
-
-class _KVTable extends StatelessWidget {
-  final List<List<String>> rows;
-  const _KVTable(this.rows);
-
-  @override
-  Widget build(BuildContext context) {
-    return Table(
-      columnWidths: const {
-        0: IntrinsicColumnWidth(),
-        1: FlexColumnWidth(),
-      },
-      children: rows.map((row) {
-        return TableRow(children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-            child: Text(row[0],
-                style: TextStyle(
+  Widget _tappableCell(String value, VoidCallback onTap, Color color) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          color: Colors.transparent,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  value,
+                  style: const TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[700],
-                    fontWeight: FontWeight.w500)),
+                    color: Color(0xFF1565C0),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(width: 3),
+              const Icon(Icons.edit_outlined,
+                  size: 11, color: Color(0xFF1565C0)),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-            child: Text(row.length > 1 ? row[1] : '—',
+        ),
+      );
+
+  Widget _hCell(String t, Color c) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        child: Text(t,
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.bold, color: c),
+            textAlign: TextAlign.center),
+      );
+
+  Widget _dCell(String t, Color c) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        child: Text(t.isEmpty ? '—' : t,
+            style: const TextStyle(fontSize: 12, color: Colors.black87),
+            textAlign: TextAlign.center),
+      );
+}//  Section label helper
+
+class _SectionLabel extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  const _SectionLabel(this.title, {required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Icon(icon, size: 14, color: color),
+      const SizedBox(width: 6),
+      Text(
+        title,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: color,
+          letterSpacing: 0.3,
+        ),
+      ),
+    ]);
+  }
+}
+
+//  Size Picker Bottom-Sheet
+
+class _SizePickerSheet extends StatelessWidget {
+  final String title;
+  final List<String> items;
+  final String currentValue;
+  final void Function(int index) onSelect;
+  const _SizePickerSheet({
+    required this.title,
+    required this.items,
+    required this.currentValue,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 16, bottom: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Text(
+                title,
                 style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600)),
-          ),
-        ]);
-      }).toList(),
-    );
-  }
-}
-
-class _TH extends StatelessWidget {
-  final String text;
-  const _TH(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      child: Text(text,
-          style: const TextStyle(
-              fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
-    );
-  }
-}
-
-class _TD extends StatelessWidget {
-  final String text;
-  final bool bold;
-  const _TD(this.text, {this.bold = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 11,
-              fontWeight: bold ? FontWeight.w600 : FontWeight.normal)),
-    );
-  }
-}
-
-class _NoteChips extends StatelessWidget {
-  final List<dynamic> notes;
-  const _NoteChips(this.notes);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 4,
-        children: notes
-            .map((n) => Chip(
-                  label: Text(n.toString(),
-                      style: const TextStyle(fontSize: 10)),
-                  padding: EdgeInsets.zero,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor: Colors.blue.shade50,
-                ))
-            .toList(),
+                    fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const Divider(height: 8),
+            ...items.asMap().entries.map((e) {
+              final isSelected = e.value.contains(currentValue) ||
+                  currentValue.contains(e.value.split(' ').first);
+              return ListTile(
+                dense: true,
+                leading: Icon(
+                  isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 18,
+                  color: isSelected
+                      ? AppColors.primary
+                      : Colors.grey.shade400,
+                ),
+                title: Text(e.value,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal)),
+                onTap: () {
+                  onSelect(e.key);
+                  Navigator.pop(context);
+                },
+              );
+            }),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  const _InfoRow(this.icon, this.label, this.value);
+//  Sub-widgets 
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(children: [
-        Icon(icon, size: 15, color: Colors.grey[500]),
-        const SizedBox(width: 6),
-        Text('$label: ',
-            style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-        Expanded(
-          child: Text(value,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w500, fontSize: 12)),
-        ),
-      ]),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  final Widget child;
-  const _SectionCard({required this.child});
+class _FloorBadge extends StatelessWidget {
+  final String floor;
+  const _FloorBadge(this.floor);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withAlpha(13),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+        color: AppColors.primary.withAlpha(20),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withAlpha(60)),
+      ),
+      child: Text(
+        floor,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: AppColors.primary,
+        ),
+      ),
+    );
+  }
+}
+
+class _KVRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _KVRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
         ],
       ),
-      child: child,
+    );
+  }
+}
+
+class _PlaceholderNote extends StatelessWidget {
+  final String message;
+  const _PlaceholderNote(this.message);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(children: [
+        Icon(Icons.info_outline, size: 14, color: Colors.grey.shade500),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message,
+            style:
+                TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+//  Error / No-data views 
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorView(this.message, {required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 13, color: Colors.red)),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoDataView extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _NoDataView({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.architecture_outlined,
+                size: 64, color: Color(0xFF1565C0)),
+            const SizedBox(height: 14),
+            const Text('No Building Plan Data',
+                style: TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text(
+              'Upload and analyse a building plan first to see\n'
+              'Foundation, Structural Frame, Walling and Finishing details.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

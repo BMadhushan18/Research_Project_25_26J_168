@@ -140,6 +140,11 @@ class _ProjectCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  IconButton(
+                    onPressed: () => _showDeleteDialog(context),
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    tooltip: 'Delete project',
+                  ),
                   const Icon(Icons.chevron_right, color: Colors.grey),
                 ],
               ),
@@ -158,6 +163,42 @@ class _ProjectCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Project'),
+        content: Text('Are you sure you want to delete "${project.location}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              try {
+                await context.read<MongoProjectProvider>().deleteProject(project.projectId);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Project deleted successfully')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete project: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

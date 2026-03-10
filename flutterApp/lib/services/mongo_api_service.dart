@@ -81,18 +81,38 @@ class MongoApiService {
     final res = await http.get(Uri.parse(_url(path)), headers: _headers)
         .timeout(const Duration(seconds: 15));
     if (res.statusCode >= 200 && res.statusCode < 300) {
-      return jsonDecode(res.body) as List<dynamic>;
+      try {
+        return jsonDecode(res.body) as List<dynamic>;
+      } on FormatException {
+        throw Exception(_unexpectedResponseMessage(res));
+      }
     }
-    final err = jsonDecode(res.body);
-    throw Exception(err['error'] ?? 'HTTP ${res.statusCode}');
+    try {
+      final err = jsonDecode(res.body);
+      throw Exception(err['error'] ?? 'HTTP ${res.statusCode}');
+    } on FormatException {
+      throw Exception(_unexpectedResponseMessage(res));
+    }
   }
 
   Map<String, dynamic> _parse(http.Response res) {
-    final body = jsonDecode(res.body);
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      return body as Map<String, dynamic>;
+    try {
+      final body = jsonDecode(res.body);
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return body as Map<String, dynamic>;
+      }
+      throw Exception((body as Map)['error'] ?? 'HTTP ${res.statusCode}');
+    } on FormatException {
+      throw Exception(_unexpectedResponseMessage(res));
     }
-    throw Exception((body as Map)['error'] ?? 'HTTP ${res.statusCode}');
+  }
+
+  String _unexpectedResponseMessage(http.Response res) {
+    final snippet = res.body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final preview = snippet.length > 120 ? '${snippet.substring(0, 120)}...' : snippet;
+    return 'Unexpected response from ${res.request?.url ?? 'server'} '
+        '(HTTP ${res.statusCode}). Check that the app is pointing to ${AppConfig.baseUrl}. '
+        'Response: $preview';
   }
 
   // ─── Auth endpoints ────────────────────────────────────────────────────────
@@ -144,6 +164,27 @@ class MongoApiService {
 
   Future<Map<String, dynamic>> getBuildingStructure(String pid) =>
       get('/buildingstructure/$pid');
+
+  Future<Map<String, dynamic>> postStructuralFrame(
+          String pid, Map<String, dynamic> data) =>
+      post('/structuralframe/$pid', data);
+
+  Future<Map<String, dynamic>> getStructuralFrame(String pid) =>
+      get('/structuralframe/$pid');
+
+  Future<Map<String, dynamic>> postWalling(
+          String pid, Map<String, dynamic> data) =>
+      post('/walling/$pid', data);
+
+  Future<Map<String, dynamic>> getWalling(String pid) =>
+      get('/walling/$pid');
+
+  Future<Map<String, dynamic>> postFinishing(
+          String pid, Map<String, dynamic> data) =>
+      post('/finishing/$pid', data);
+
+  Future<Map<String, dynamic>> getFinishing(String pid) =>
+      get('/finishing/$pid');
 
   // ─── Subcollection endpoints ───────────────────────────────────────────────
   Future<List<dynamic>> getSub(String pid, String sub) =>

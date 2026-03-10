@@ -12,6 +12,11 @@ import 'create_project_flow.dart';
 import 'projects/projects_screen.dart';
 import 'build_project_screen.dart';
 import 'settings_gemini.dart';
+import 'contour_detection_screen.dart';
+import 'edge_detection_screen.dart';
+import 'comprehensive_cv_screen.dart';
+import 'hough_line_transform_screen.dart';
+import 'combined_hough_contour_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -455,6 +460,42 @@ class _HomePageState extends State<HomePage>
           color: const Color(0xFF00897B),
           onTap: _navigateToBuildProject,
         ),
+        const SizedBox(height: 12),
+        _buildToolCard(
+          icon: Icons.auto_awesome_mosaic_rounded,
+          title: 'Contour Detection',
+          description: 'Upload any image — detect and highlight edges & contours',
+          color: const Color(0xFF1565C0),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const ContourDetectionScreen()),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildToolCard(
+          icon: Icons.blur_on_rounded,
+          title: 'Edge Detection',
+          description: 'Upload any image — detect and highlight edges',
+          color: const Color(0xFF1565C0),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const EdgeDetectionScreen()),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildToolCard(
+          icon: Icons.analytics_rounded,
+          title: 'Comprehensive CV',
+          description: 'Complete analysis: edges, shapes, and corners',
+          color: const Color(0xFF4CAF50),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const ComprehensiveCVScreen()),
+          ),
+        ),
       ],
     );
   }
@@ -803,6 +844,75 @@ class _HomePageState extends State<HomePage>
                       context,
                       MaterialPageRoute(
                           builder: (context) => const ProjectsScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.auto_awesome_mosaic_rounded,
+                  title: 'Contour Detection',
+                  color: const Color(0xFF1565C0),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              const ContourDetectionScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.blur_on_rounded,
+                  title: 'Edge Detection',
+                  color: const Color(0xFF1565C0),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const EdgeDetectionScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.analytics_rounded,
+                  title: 'Comprehensive CV',
+                  color: const Color(0xFF4CAF50),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              const ComprehensiveCVScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.line_axis_rounded,
+                  title: 'Hough Line Transform',
+                  color: const Color(0xFF9C27B0),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              const HoughLineTransformScreen()),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.hub_rounded,
+                  title: 'CombinedHoughlineNcontour',
+                  color: const Color(0xFF6A1B9A),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              const CombinedHoughContourScreen()),
                     );
                   },
                 ),

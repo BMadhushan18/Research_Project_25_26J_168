@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../services/mongo_api_service.dart';
+import '../config/app_config.dart';
 
 /// MongoDB-backed auth provider.
 /// Drop-in replacement for Firebase AuthProvider — same public interface.
@@ -123,9 +124,11 @@ class MongoAuthProvider extends ChangeNotifier {
     if (raw.contains('Invalid email or password')) return 'Invalid email or password';
     if (raw.contains('Email already in use'))      return 'Email already in use';
     if (raw.contains('SocketException') || raw.contains('Connection refused')) {
-      return 'Cannot reach server. Check your network or backend.';
+      return 'Cannot reach server at ${AppConfig.baseUrl}. Check your network or backend.';
     }
-    if (raw.contains('TimeoutException')) return 'Request timed out. Try again.';
+    if (raw.contains('TimeoutException')) {
+      return 'Request timed out while connecting to ${AppConfig.baseUrl}. Try again.';
+    }
     return raw.replaceFirst('Exception: ', '');
   }
 }

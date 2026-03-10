@@ -19,26 +19,45 @@ import json
 app = Flask(__name__)
 CORS(app)
 
+# ─── Contour Detection Blueprint (bawanthaModel) ──────────────────────────────
+from bawanthaModel.contour_routes import contour_bp
+app.register_blueprint(contour_bp)
+
+# ─── Comprehensive CV Analysis Blueprint ───────────────────────────────────
+from bawanthaModel.comprehensive_cv_routes import comprehensive_cv_bp
+app.register_blueprint(comprehensive_cv_bp)
+
 # ─── Config ───────────────────────────────────────────────────────────────────
-MONGO_URI  = "mongodb+srv://smartConstructiondb:admin123@smartconstructioncluste.fmhajos.mongodb.net/"
-DB_NAME    = "smartConstructionDB"
+MONGO_URI  = os.getenv(
+    "MONGO_URI",
+    "mongodb+srv://smartConstructiondb:admin123@smartconstructioncluste.fmhajos.mongodb.net/"
+)
+DB_NAME    = os.getenv("MONGO_DB_NAME", "smartConstructionDB")
 JWT_SECRET = "scms_jwt_secret_2026_changeme"
 JWT_EXPIRY_DAYS = 30
 PORT       = 8090
+MONGO_TIMEOUT_MS = int(os.getenv("MONGO_TIMEOUT_MS", "10000"))
 
 # ─── MongoDB connection ────────────────────────────────────────────────────────
-client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000)
+client = MongoClient(
+    MONGO_URI,
+    serverSelectionTimeoutMS=MONGO_TIMEOUT_MS,
+    connectTimeoutMS=MONGO_TIMEOUT_MS,
+    socketTimeoutMS=MONGO_TIMEOUT_MS,
+)
 db     = client[DB_NAME]
+
+DB_READY = False
+DB_INIT_ERROR = "Database init has not run yet."
 
 users_col             = db["users"]
 projects_col          = db["projects"]
 threejs_col           = db["threejs"]
 buildingstructure_col = db["buildingstructure"]
+structuralframe_col   = db["structuralframe"]
+walling_col           = db["walling"]
+finishing_col         = db["finishing"]
 materials_col         = db["materials"]
-
-# Ensure indexes
-users_col.create_index("email", unique=True)
-materials_col.create_index("name_lower")
 
 # ─── Seed materials (runs at startup, drops + re-inserts so brand names stay correct) ─
 _MAT_SEED = [
@@ -116,7 +135,26 @@ def _seed_materials():
     materials_col.insert_many(docs)
     print(f"[seed] Inserted {len(docs)} material records.")
 
-_seed_materials()
+
+def _init_db() -> None:
+    """Initialize Mongo indexes/seed once at startup with clear diagnostics."""
+    global DB_READY, DB_INIT_ERROR
+    try:
+        client.admin.command("ping")
+        users_col.create_index("email", unique=True)
+        materials_col.create_index("name_lower")
+        _seed_materials()
+        DB_READY = True
+        DB_INIT_ERROR = ""
+        print("[db] MongoDB connected and initialized.")
+    except Exception as e:
+        DB_READY = False
+        DB_INIT_ERROR = str(e)
+        print("[db] MongoDB initialization failed:")
+        print(f"[db] {DB_INIT_ERROR}")
+
+
+_init_db()
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def make_token(uid: str) -> str:
@@ -484,7 +522,117 @@ def get_building_structure(pid):
     return jsonify(bson_to_dict(saved)), 200
 
 
-# ─── ThreeJS per-project HTML routes ─────────────────────────────────────────
+# ─── Structural Frame endpoints ───────────────────────────────────────────────
+@app.route("/structuralframe/<pid>", methods=["POST"])
+def save_structural_frame(pid):
+    uid = get_current_uid()
+    if not uid:
+        return err("Unauthorized", 401)
+    doc = find_project(pid, uid)
+    if not doc:
+        return err("Project not found", 404)
+    body = request.json or {}
+    print(f"[save_structural_frame] pid={pid} uid={uid}")
+    payload = {
+        "projectId": pid,
+        "ownerUid": uid,
+        "data": body,
+        "savedAt": datetime.datetime.utcnow().isoformat(),
+    }
+    structuralframe_col.update_one(
+        {"projectId": pid},
+        {"$set": payload},
+        upsert=True,
+    )
+    saved = structuralframe_col.find_one({"projectId": pid})
+    return jsonify(bson_to_dict(saved)), 200
+
+
+@app.route("/structuralframe/<pid>", methods=["GET"])
+def get_structural_frame(pid):
+    uid = get_current_uid()
+    if not uid:
+        return err("Unauthorized", 401)
+    saved = structuralframe_col.find_one({"projectId": pid})
+    if not saved:
+        return jsonify({}), 200
+    return jsonify(bson_to_dict(saved)), 200
+
+
+# ─── Walling endpoints ────────────────────────────────────────────────────────
+@app.route("/walling/<pid>", methods=["POST"])
+def save_walling(pid):
+    uid = get_current_uid()
+    if not uid:
+        return err("Unauthorized", 401)
+    doc = find_project(pid, uid)
+    if not doc:
+        return err("Project not found", 404)
+    body = request.json or {}
+    print(f"[save_walling] pid={pid} uid={uid}")
+    payload = {
+        "projectId": pid,
+        "ownerUid": uid,
+        "data": body,
+        "savedAt": datetime.datetime.utcnow().isoformat(),
+    }
+    walling_col.update_one(
+        {"projectId": pid},
+        {"$set": payload},
+        upsert=True,
+    )
+    saved = walling_col.find_one({"projectId": pid})
+    return jsonify(bson_to_dict(saved)), 200
+
+
+@app.route("/walling/<pid>", methods=["GET"])
+def get_walling(pid):
+    uid = get_current_uid()
+    if not uid:
+        return err("Unauthorized", 401)
+    saved = walling_col.find_one({"projectId": pid})
+    if not saved:
+        return jsonify({}), 200
+    return jsonify(bson_to_dict(saved)), 200
+
+
+# ─── Finishing endpoints ──────────────────────────────────────────────────────
+@app.route("/finishing/<pid>", methods=["POST"])
+def save_finishing(pid):
+    uid = get_current_uid()
+    if not uid:
+        return err("Unauthorized", 401)
+    doc = find_project(pid, uid)
+    if not doc:
+        return err("Project not found", 404)
+    body = request.json or {}
+    print(f"[save_finishing] pid={pid} uid={uid}")
+    payload = {
+        "projectId": pid,
+        "ownerUid": uid,
+        "data": body,
+        "savedAt": datetime.datetime.utcnow().isoformat(),
+    }
+    finishing_col.update_one(
+        {"projectId": pid},
+        {"$set": payload},
+        upsert=True,
+    )
+    saved = finishing_col.find_one({"projectId": pid})
+    return jsonify(bson_to_dict(saved)), 200
+
+
+@app.route("/finishing/<pid>", methods=["GET"])
+def get_finishing(pid):
+    uid = get_current_uid()
+    if not uid:
+        return err("Unauthorized", 401)
+    saved = finishing_col.find_one({"projectId": pid})
+    if not saved:
+        return jsonify({}), 200
+    return jsonify(bson_to_dict(saved)), 200
+
+
 @app.route("/threejs/<project_id>", methods=["GET"])
 def get_threejs(project_id):
     uid = get_current_uid()
@@ -692,9 +840,21 @@ def delete_material(material_id):
 def health():
     try:
         client.admin.command("ping")
-        return jsonify({"status": "ok", "db": DB_NAME, "mongo": "connected"}), 200
+        return jsonify({
+            "status": "ok",
+            "db": DB_NAME,
+            "mongo": "connected",
+            "dbReady": DB_READY,
+        }), 200
     except Exception as e:
-        return jsonify({"status": "error", "detail": str(e)}), 500
+        return jsonify({
+            "status": "error",
+            "db": DB_NAME,
+            "mongo": "disconnected",
+            "dbReady": DB_READY,
+            "detail": str(e),
+            "startupError": DB_INIT_ERROR,
+        }), 500
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
