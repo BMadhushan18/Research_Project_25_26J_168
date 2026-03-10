@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
+import '../../services/mongo_api_service.dart';
 import 'phase_result.dart';
 
 class StructuralWallDurationScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class StructuralWallDurationScreen extends StatefulWidget {
 
 class _StructuralWallDurationScreenState extends State<StructuralWallDurationScreen> {
   final _formKey = GlobalKey<FormState>();
+  final MongoApiService _api = MongoApiService();
 
   String _wallType = 'Brick';
 
@@ -23,6 +25,7 @@ class _StructuralWallDurationScreenState extends State<StructuralWallDurationScr
   final TextEditingController _wallAreaCtrl = TextEditingController();
 
   int _laborCount = 5;
+  bool _isLoading = false;
 
   final List<String> _wallTypes = const ['Brick', 'Concrete'];
 
@@ -30,6 +33,7 @@ class _StructuralWallDurationScreenState extends State<StructuralWallDurationScr
   void initState() {
     super.initState();
     _laborCount = widget.initialLabors < 1 ? 1 : widget.initialLabors;
+    _api.loadToken();
   }
 
   @override
@@ -39,61 +43,48 @@ class _StructuralWallDurationScreenState extends State<StructuralWallDurationScr
     super.dispose();
   }
 
-  // ----------------------------- Estimation Logic ----------------------------
-  // Baseline productivity (m²/day) for 5 labors:
-  // - Brick is slower than Concrete block walls.
-  int _estimateWallDays({
-    required String wallType,
-    required double floorAreaM2,
-    required double wallAreaM2,
-    required int laborCount,
-  }) {
-    // sanity fallback: if wall area not provided properly, estimate from floor area
-    // (typical relation: wallArea ≈ floorArea * 1.7)
-    final effectiveWallArea = wallAreaM2 > 0 ? wallAreaM2 : (floorAreaM2 * 1.7);
-
-    // base m2/day for 5 labors
-    double baseM2PerDay = wallType == 'Brick' ? 18.0 : 24.0;
-
-    // labor scaling (diminishing returns)
-    final lc = laborCount.clamp(1, 50);
-    double laborEfficiency = lc / 5.0;
-    laborEfficiency = (laborEfficiency <= 2.0)
-        ? laborEfficiency
-        : (2.0 + (laborEfficiency - 2.0) * 0.6);
-
-    final effectiveM2PerDay = baseM2PerDay * laborEfficiency;
-
-    // duration = area / productivity
-    final rawDays = effectiveWallArea / (effectiveM2PerDay <= 0 ? 0.1 : effectiveM2PerDay);
-
-    // overhead days (setting out, curing, lintels etc.)
-    final overheadDays = wallType == 'Brick' ? 2.0 : 1.5;
-
-    final days = (rawDays + overheadDays).round();
-    return days < 1 ? 1 : days;
-  }
-
-  void _onCalculate() {
+  Future<void> _onCalculate() async {
     if (!_formKey.currentState!.validate()) return;
 
     final floorArea = double.parse(_floorAreaCtrl.text.trim());
     final wallArea = double.parse(_wallAreaCtrl.text.trim());
 
-    final days = _estimateWallDays(
-      wallType: _wallType,
-      floorAreaM2: floorArea,
-      wallAreaM2: wallArea,
-      laborCount: _laborCount,
-    );
+    setState(() => _isLoading = true);
 
-    Navigator.pop(
-      context,
-      PhaseResult(
-        durationDays: days,
-        laborCount: _laborCount,
-      ),
-    );
+    try {
+      final payload = <String, dynamic>{
+        'wall_type': _wallType,
+        'floor_area_m2': floorArea,
+        'total_wall_area_m2': wallArea,
+        'working_hours_per_day': 8,
+        'labor_count': _laborCount,
+      };
+
+      final res = await _api.predictWallDuration(payload);
+      final raw = res['duration_days'];
+      final days = (raw is int) ? raw : (raw as num).round();
+
+      if (!mounted) return;
+
+      Navigator.pop(
+        context,
+        PhaseResult(
+          durationDays: days < 1 ? 1 : days,
+          laborCount: _laborCount,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Prediction failed: ${e.toString().replaceFirst('Exception: ', '')}'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   // ----------------------------- UI -----------------------------------------
@@ -154,11 +145,17 @@ class _StructuralWallDurationScreenState extends State<StructuralWallDurationScr
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton.icon(
-                  onPressed: _onCalculate,
-                  icon: const Icon(Icons.calculate_rounded),
-                  label: const Text(
-                    'Calculate',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  onPressed: _isLoading ? null : _onCalculate,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.calculate_rounded),
+                  label: Text(
+                    _isLoading ? 'Calculating...' : 'Calculate',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryDark,

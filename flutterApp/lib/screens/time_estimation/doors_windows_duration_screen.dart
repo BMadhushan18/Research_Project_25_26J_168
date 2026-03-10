@@ -1,19 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
+import '../../services/mongo_api_service.dart';
 import 'phase_result.dart';
-
-/// ---------------------------------------------------------------------------
-/// DoorsWindowsDurationScreen
-/// - Fields:
-///   1) Doors Count
-///   2) Door Material (dropdown): Aluminium, Timber, Glass, uPVC
-///   3) Window Count
-///   4) Window Material (dropdown): Aluminium, Timber, Glass, uPVC
-///   5) Labor Count (counter)
-/// - On Calculate:
-///   -> estimate duration days
-///   -> return result to PhaseWiseDurationScreen via Navigator.pop(result)
-/// ---------------------------------------------------------------------------
 
 class DoorsWindowsDurationScreen extends StatefulWidget {
   final int initialLabors;
@@ -29,6 +17,7 @@ class DoorsWindowsDurationScreen extends StatefulWidget {
 
 class _DoorsWindowsDurationScreenState extends State<DoorsWindowsDurationScreen> {
   final _formKey = GlobalKey<FormState>();
+  final MongoApiService _api = MongoApiService();
 
   final TextEditingController _doorCountCtrl = TextEditingController();
   final TextEditingController _windowCountCtrl = TextEditingController();
@@ -36,6 +25,7 @@ class _DoorsWindowsDurationScreenState extends State<DoorsWindowsDurationScreen>
   String _doorMaterial = 'Timber';
   String _windowMaterial = 'Timber';
   int _laborCount = 5;
+  bool _isLoading = false;
 
   final List<String> _materials = const ['Aluminium', 'Timber', 'Glass', 'uPVC'];
 
@@ -43,6 +33,7 @@ class _DoorsWindowsDurationScreenState extends State<DoorsWindowsDurationScreen>
   void initState() {
     super.initState();
     _laborCount = widget.initialLabors < 1 ? 1 : widget.initialLabors;
+    _api.loadToken();
   }
 
   @override
@@ -52,83 +43,44 @@ class _DoorsWindowsDurationScreenState extends State<DoorsWindowsDurationScreen>
     super.dispose();
   }
 
-  // ----------------------------- Estimation Logic ----------------------------
-  // Approx. productivity (units/day) for 5 labors, based on your earlier notes:
-  // Doors per day:
-  // - Timber: 2
-  // - Aluminium: 3.5 (avg of 3-4)
-  // - uPVC: 4
-  // - Glass: 2.5 (avg of 2-3)
-  //
-  // Windows are similar but slightly faster/slower depending on site;
-  // we'll use a close baseline.
-  int _estimateDoorsWindowsDays({
-    required int doorCount,
-    required String doorMaterial,
-    required int windowCount,
-    required String windowMaterial,
-    required int laborCount,
-  }) {
-    final Map<String, double> doorsPerDay5Labors = {
-      'Timber': 2.0,
-      'Aluminium': 3.5,
-      'uPVC': 4.0,
-      'Glass': 2.5,
-    };
-
-    final Map<String, double> windowsPerDay5Labors = {
-      // windows often similar; we keep close baselines
-      'Timber': 3.0,
-      'Aluminium': 4.0,
-      'uPVC': 4.5,
-      'Glass': 3.0,
-    };
-
-    final doorRate = doorsPerDay5Labors[doorMaterial] ?? 3.0;
-    final windowRate = windowsPerDay5Labors[windowMaterial] ?? 3.5;
-
-    // labor scaling (diminishing returns after ~10)
-    final lc = laborCount.clamp(1, 50);
-    double laborEfficiency = lc / 5.0;
-    laborEfficiency = (laborEfficiency <= 2.0)
-        ? laborEfficiency
-        : (2.0 + (laborEfficiency - 2.0) * 0.6);
-
-    final effectiveDoorRate = doorRate * laborEfficiency;
-    final effectiveWindowRate = windowRate * laborEfficiency;
-
-    final doorDays = doorCount / (effectiveDoorRate <= 0 ? 0.1 : effectiveDoorRate);
-    final windowDays = windowCount / (effectiveWindowRate <= 0 ? 0.1 : effectiveWindowRate);
-
-    // some tasks can overlap; but still not fully parallel.
-    // We use combined time with partial overlap.
-    final combined = (doorDays + windowDays) * 0.85;
-
-    // overhead: measurements, sealing, finishing
-    final overhead = (doorCount + windowCount) > 12 ? 2.0 : 1.0;
-
-    final days = (combined + overhead).round();
-    return days < 1 ? 1 : days;
-  }
-
-  void _onCalculate() {
+  Future<void> _onCalculate() async {
     if (!_formKey.currentState!.validate()) return;
 
     final doorCount = int.parse(_doorCountCtrl.text.trim());
     final windowCount = int.parse(_windowCountCtrl.text.trim());
 
-    final days = _estimateDoorsWindowsDays(
-      doorCount: doorCount,
-      doorMaterial: _doorMaterial,
-      windowCount: windowCount,
-      windowMaterial: _windowMaterial,
-      laborCount: _laborCount,
-    );
+    setState(() => _isLoading = true);
 
-    Navigator.pop(
-      context,
-      PhaseResult(durationDays: days, laborCount: _laborCount),
-    );
+    try {
+      final payload = <String, dynamic>{
+        'door_count': doorCount,
+        'door_material': _doorMaterial,
+        'window_count': windowCount,
+        'window_material': _windowMaterial,
+        'labor_count': _laborCount,
+      };
+
+      final res = await _api.predictDoorWindowDuration(payload);
+      final raw = res['duration_days'];
+      final days = (raw is int) ? raw : (raw as num).round();
+
+      if (!mounted) return;
+      Navigator.pop(
+        context,
+        PhaseResult(durationDays: days < 1 ? 1 : days, laborCount: _laborCount),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Prediction failed: ${e.toString().replaceFirst('Exception: ', '')}'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   // ----------------------------- UI -----------------------------------------
@@ -198,11 +150,17 @@ class _DoorsWindowsDurationScreenState extends State<DoorsWindowsDurationScreen>
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton.icon(
-                  onPressed: _onCalculate,
-                  icon: const Icon(Icons.calculate_rounded),
-                  label: const Text(
-                    'Calculate',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  onPressed: _isLoading ? null : _onCalculate,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.calculate_rounded),
+                  label: Text(
+                    _isLoading ? 'Calculating...' : 'Calculate',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryDark,

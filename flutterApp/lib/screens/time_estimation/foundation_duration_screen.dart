@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
+import '../../services/mongo_api_service.dart';
 import 'phase_result.dart';
 
 class FoundationDurationScreen extends StatefulWidget {
@@ -7,7 +8,7 @@ class FoundationDurationScreen extends StatefulWidget {
 
   const FoundationDurationScreen({
     super.key,
-    this.initialLabors = 5,
+    required this.initialLabors,
   });
 
   @override
@@ -16,172 +17,156 @@ class FoundationDurationScreen extends StatefulWidget {
 
 class _FoundationDurationScreenState extends State<FoundationDurationScreen> {
   final _formKey = GlobalKey<FormState>();
+  final MongoApiService _api = MongoApiService();
 
-  // dropdowns
+  bool _isLoading = false;
+
+  // Form fields
   String _foundationType = 'Concrete';
   String _soilType = 'Normal';
-
-  // inputs
-  final TextEditingController _volumeCtrl = TextEditingController();
+  final TextEditingController _volumeController = TextEditingController();
   int _laborCount = 5;
 
-  final List<String> _foundationTypes = const ['Rubble', 'Concrete', 'Strip', 'Pile', 'Raft'];
-  final List<String> _soilTypes = const ['Soft', 'Normal', 'Hard'];
+  // Example dropdown options (edit to your dataset categories)
+  final List<String> _foundationTypes = ['Concrete', 'Rubble', 'Strip', 'Pile', 'Raft'];
+  final List<String> _soilTypes = ['Normal', 'Sandy', 'Clay', 'Rocky', 'Wet'];
 
   @override
   void initState() {
     super.initState();
-    _laborCount = widget.initialLabors < 1 ? 1 : widget.initialLabors;
+    _laborCount = widget.initialLabors;
+    _api.loadToken(); // optional (post() also ensures token)
   }
 
   @override
   void dispose() {
-    _volumeCtrl.dispose();
+    _volumeController.dispose();
     super.dispose();
   }
 
-  // ----------------------------- Estimation Logic ----------------------------
-  // Practical baseline productivity (m3/day) for 5 labors, Normal soil.
-  // Then adjust for foundation type + soil type + labor count.
-  int _estimateFoundationDays({
-    required String foundationType,
-    required String soilType,
-    required double volumeM3,
-    required int laborCount,
-  }) {
-    // base m3/day with 5 labors (Normal soil, Concrete base)
-    double baseM3PerDay = 2.2;
-
-    // foundation complexity factor (higher => slower)
-    final Map<String, double> foundationFactor = {
-      'Rubble': 1.10,
-      'Concrete': 1.00,
-      'Strip': 1.05,
-      'Pile': 1.45,
-      'Raft': 1.25,
-    };
-
-    // soil difficulty factor
-    final Map<String, double> soilFactor = {
-      'Soft': 1.20,    // more shoring / collapse risk
-      'Normal': 1.00,
-      'Hard': 1.30,    // harder excavation
-    };
-
-    final f = foundationFactor[foundationType] ?? 1.0;
-    final s = soilFactor[soilType] ?? 1.0;
-
-    // labor scaling: diminishing returns after ~10
-    final lc = laborCount.clamp(1, 50);
-    double laborEfficiency = lc / 5.0;
-    // diminishing returns
-    laborEfficiency = (laborEfficiency <= 2.0)
-        ? laborEfficiency
-        : (2.0 + (laborEfficiency - 2.0) * 0.6);
-
-    final effectiveM3PerDay = (baseM3PerDay / (f * s)) * laborEfficiency;
-
-    // duration = volume / productivity
-    final rawDays = volumeM3 / (effectiveM3PerDay <= 0 ? 0.1 : effectiveM3PerDay);
-
-    // add small fixed overhead (setting out, curing prep etc.)
-    final overheadDays = foundationType == 'Pile' ? 2.0 : 1.0;
-
-    final days = (rawDays + overheadDays).round();
-    return days < 1 ? 1 : days;
-  }
-
-  void _onCalculate() {
+  Future<void> _calculate() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final volume = double.parse(_volumeCtrl.text.trim());
-    final days = _estimateFoundationDays(
-      foundationType: _foundationType,
-      soilType: _soilType,
-      volumeM3: volume,
-      laborCount: _laborCount,
-    );
+    final volume = double.parse(_volumeController.text.trim());
 
-    Navigator.pop(
-      context,
-      PhaseResult(
-        durationDays: days,
-        laborCount: _laborCount,
-      ),
-    );
+    setState(() => _isLoading = true);
+
+
+//  data columns
+
+    try {
+      final payload = <String, dynamic>{
+        "foundation_type": _foundationType,
+        "soil_condition": _soilType,
+        "total_volume_m3": volume,
+        "labor_count": _laborCount,
+     };
+
+      final res = await _api.predictFoundationDuration(payload);
+
+      final raw = res["duration_days"];
+      final durationDays = (raw is int) ? raw : (raw as num).round();
+
+      if (!mounted) return;
+
+      Navigator.pop(
+        context,
+        PhaseResult(
+          durationDays: durationDays < 1 ? 1 : durationDays,
+          laborCount: _laborCount,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Prediction failed: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  // ----------------------------- UI -----------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Foundation'),
+        title: const Text('Foundation Duration'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeaderCard(),
+              _header(),
               const SizedBox(height: 18),
 
-              _buildDropdown(
+              _dropdown(
                 label: 'Foundation Type',
                 value: _foundationType,
                 items: _foundationTypes,
-                icon: Icons.account_balance_rounded,
+                icon: Icons.account_balance,
                 onChanged: (v) => setState(() => _foundationType = v!),
               ),
-              const SizedBox(height: 14),
 
-              _buildDropdown(
+              _dropdown(
                 label: 'Soil Type',
                 value: _soilType,
                 items: _soilTypes,
-                icon: Icons.terrain_rounded,
+                icon: Icons.landscape,
                 onChanged: (v) => setState(() => _soilType = v!),
               ),
-              const SizedBox(height: 14),
 
-              _buildNumberField(
-                controller: _volumeCtrl,
+              _textField(
+                controller: _volumeController,
                 label: 'Volume (m³)',
-                icon: Icons.square_foot_rounded,
-                hint: 'e.g. 18.5',
+                icon: Icons.straighten,
+                hint: 'e.g. 106.5',
               ),
-              const SizedBox(height: 14),
 
-              _buildCounterField(
+              const SizedBox(height: 16),
+              _counterField(
                 label: 'Labor Count',
                 value: _laborCount,
-                icon: Icons.groups_rounded,
                 onChanged: (v) => setState(() => _laborCount = v),
+                icon: Icons.groups,
+                min: 1,
+                max: 50,
               ),
 
               const SizedBox(height: 26),
-
               SizedBox(
                 width: double.infinity,
                 height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: _onCalculate,
-                  icon: const Icon(Icons.calculate_rounded),
-                  label: const Text(
-                    'Calculate',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                  ),
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _calculate,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryDark,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 4,
                   ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text(
+                          'Calculate',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
             ],
@@ -191,35 +176,33 @@ class _FoundationDurationScreenState extends State<FoundationDurationScreen> {
     );
   }
 
-  Widget _buildHeaderCard() {
+  Widget _header() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.borderLight),
       ),
-      child: Row(
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
+          Text(
+            'Foundation Phase',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
             ),
-            child: const Icon(Icons.foundation_rounded, color: AppColors.primary),
           ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Fill foundation details and calculate estimated duration (days).',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-              ),
+          SizedBox(height: 6),
+          Text(
+            'Enter foundation details to estimate phase duration.',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.3,
             ),
           ),
         ],
@@ -227,28 +210,31 @@ class _FoundationDurationScreenState extends State<FoundationDurationScreen> {
     );
   }
 
-  Widget _buildDropdown({
+  Widget _dropdown({
     required String label,
     required String value,
     required List<String> items,
     required IconData icon,
     required ValueChanged<String?> onChanged,
   }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: AppColors.primary),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: DropdownButtonFormField<String>(
+        value: value,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: AppColors.primary),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          filled: true,
+          fillColor: Colors.white,
+        ),
+        items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
+        onChanged: onChanged,
       ),
-      items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
-      onChanged: onChanged,
     );
   }
 
-  Widget _buildNumberField({
+  Widget _textField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -261,58 +247,49 @@ class _FoundationDurationScreenState extends State<FoundationDurationScreen> {
         labelText: label,
         hintText: hint,
         prefixIcon: Icon(icon, color: AppColors.primary),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
       ),
       validator: (v) {
         if (v == null || v.trim().isEmpty) return 'Please enter $label';
         final n = double.tryParse(v.trim());
-        if (n == null) return 'Enter a valid number';
+        if (n == null) return 'Please enter a valid number';
         if (n <= 0) return '$label must be greater than 0';
         return null;
       },
     );
   }
 
-  Widget _buildCounterField({
+  Widget _counterField({
     required String label,
     required int value,
-    required IconData icon,
     required ValueChanged<int> onChanged,
+    required IconData icon,
+    int min = 1,
+    int max = 999,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.borderLight),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
       ),
       child: Row(
         children: [
           Icon(icon, color: AppColors.primary),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+          Text(label, style: const TextStyle(fontSize: 16)),
+          const Spacer(),
           IconButton(
-            onPressed: () => value > 1 ? onChanged(value - 1) : null,
-            icon: const Icon(Icons.remove_circle_outline, color: AppColors.error),
+            onPressed: value > min ? () => onChanged(value - 1) : null,
+            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
           ),
-          Text(
-            '$value',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-          ),
+          Text('$value', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           IconButton(
-            onPressed: () => onChanged(value + 1),
-            icon: const Icon(Icons.add_circle_outline, color: AppColors.success),
+            onPressed: value < max ? () => onChanged(value + 1) : null,
+            icon: const Icon(Icons.add_circle_outline, color: Colors.green),
           ),
         ],
       ),

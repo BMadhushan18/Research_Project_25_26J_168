@@ -3,37 +3,36 @@ import '../../utils/constants.dart';
 import '../../services/mongo_api_service.dart';
 import 'phase_result.dart';
 
-class RoofDurationScreen extends StatefulWidget {
+class PaintingFinishingDurationScreen extends StatefulWidget {
   final int initialLabors;
 
-  const RoofDurationScreen({
+  const PaintingFinishingDurationScreen({
     super.key,
     this.initialLabors = 5,
   });
 
   @override
-  State<RoofDurationScreen> createState() => _RoofDurationScreenState();
+  State<PaintingFinishingDurationScreen> createState() =>
+      _PaintingFinishingDurationScreenState();
 }
 
-class _RoofDurationScreenState extends State<RoofDurationScreen> {
+class _PaintingFinishingDurationScreenState
+    extends State<PaintingFinishingDurationScreen> {
   final _formKey = GlobalKey<FormState>();
   final MongoApiService _api = MongoApiService();
 
-  final TextEditingController _roofAreaCtrl = TextEditingController();
-  final TextEditingController _roofHeightCtrl = TextEditingController();
+  final TextEditingController _paintAreaController = TextEditingController();
 
-  String _roofType = 'Gable';
-  String _coveringType = 'Concrete Tiles';
+  String _paintingLocation = 'Interior';
+  int _numberOfCoats = 2;
+  int _floors = 1;
   int _laborCount = 5;
   bool _isLoading = false;
 
-  final List<String> _roofTypes = const ['Gable', 'Flat', 'Lean-to', 'Hip'];
-  final List<String> _coveringTypes = const [
-    'Concrete Tiles',
-    'Clay Tiles',
-    'RC Slab',
-    'Asbestos Sheets',
-    'Metal Sheets',
+  final List<String> _locations = const [
+    'Interior',
+    'Exterior',
+    'Both',
   ];
 
   @override
@@ -45,29 +44,27 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
 
   @override
   void dispose() {
-    _roofAreaCtrl.dispose();
-    _roofHeightCtrl.dispose();
+    _paintAreaController.dispose();
     super.dispose();
   }
 
   Future<void> _onCalculate() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final area = double.parse(_roofAreaCtrl.text.trim());
-    final height = double.parse(_roofHeightCtrl.text.trim());
+    final paintArea = double.parse(_paintAreaController.text.trim());
 
     setState(() => _isLoading = true);
 
     try {
       final payload = <String, dynamic>{
-        'roof_area_m2': area,
-        'roof_height_m': height,
-        'roof_type': _roofType,
-        'roof_covering': _coveringType,
+        'paint_area_m2': paintArea,
+        'painting_location': _paintingLocation,
+        'number_of_coats': _numberOfCoats,
+        'floors': _floors,
         'labor_count': _laborCount,
       };
 
-      final res = await _api.predictRoofDuration(payload);
+      final res = await _api.predictPaintingDuration(payload);
       final raw = res['duration_days'];
       final days = (raw is int) ? raw : (raw as num).round();
 
@@ -75,7 +72,10 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
 
       Navigator.pop(
         context,
-        PhaseResult(durationDays: days < 1 ? 1 : days, laborCount: _laborCount),
+        PhaseResult(
+          durationDays: days < 1 ? 1 : days,
+          laborCount: _laborCount,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -97,7 +97,7 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Roofing'),
+        title: const Text('Painting and Finishing'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -112,36 +112,35 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
               const SizedBox(height: 18),
 
               _buildNumberField(
-                controller: _roofAreaCtrl,
-                label: 'Roof Area (m²)',
-                icon: Icons.crop_square_rounded,
-                hint: 'e.g. 160',
-              ),
-              const SizedBox(height: 14),
-
-              _buildNumberField(
-                controller: _roofHeightCtrl,
-                label: 'Roof Height (m)',
-                icon: Icons.height_rounded,
-                hint: 'e.g. 2.5',
+                controller: _paintAreaController,
+                label: 'Paint Area (m²)',
+                icon: Icons.square_foot_rounded,
+                hint: 'Example: 250',
               ),
               const SizedBox(height: 14),
 
               _buildDropdown(
-                label: 'Roof Type',
-                value: _roofType,
-                items: _roofTypes,
-                icon: Icons.home_work_rounded,
-                onChanged: (v) => setState(() => _roofType = v!),
+                label: 'Painting Location',
+                value: _paintingLocation,
+                items: _locations,
+                icon: Icons.location_on_rounded,
+                onChanged: (v) => setState(() => _paintingLocation = v!),
               ),
               const SizedBox(height: 14),
 
-              _buildDropdown(
-                label: 'Roof Covering Type',
-                value: _coveringType,
-                items: _coveringTypes,
-                icon: Icons.roofing_rounded,
-                onChanged: (v) => setState(() => _coveringType = v!),
+              _buildCounterField(
+                label: 'Number of Coats',
+                value: _numberOfCoats,
+                icon: Icons.format_paint_rounded,
+                onChanged: (v) => setState(() => _numberOfCoats = v),
+              ),
+              const SizedBox(height: 14),
+
+              _buildCounterField(
+                label: 'Floors',
+                value: _floors,
+                icon: Icons.layers_rounded,
+                onChanged: (v) => setState(() => _floors = v),
               ),
               const SizedBox(height: 14),
 
@@ -151,7 +150,6 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
                 icon: Icons.groups_rounded,
                 onChanged: (v) => setState(() => _laborCount = v),
               ),
-
               const SizedBox(height: 26),
 
               SizedBox(
@@ -168,12 +166,17 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
                       : const Icon(Icons.calculate_rounded),
                   label: Text(
                     _isLoading ? 'Calculating...' : 'Calculate',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryDark,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     elevation: 4,
                   ),
                 ),
@@ -203,12 +206,12 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
               color: AppColors.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.roofing_rounded, color: AppColors.primary),
+            child: const Icon(Icons.format_paint_rounded, color: AppColors.primary),
           ),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
-              'Fill roofing details and calculate estimated duration (days).',
+              'Fill painting details and calculate estimated duration (days).',
               style: TextStyle(
                 color: AppColors.textSecondary,
                 height: 1.3,
@@ -235,9 +238,13 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
         prefixIcon: Icon(icon, color: AppColors.primary),
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
       ),
-      items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
+      items: items
+          .map((i) => DropdownMenuItem(value: i, child: Text(i)))
+          .toList(),
       onChanged: onChanged,
     );
   }
@@ -257,7 +264,9 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
         prefixIcon: Icon(icon, color: AppColors.primary),
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
       ),
       validator: (v) {
         if (v == null || v.trim().isEmpty) return 'Please enter $label';
@@ -298,20 +307,27 @@ class _RoofDurationScreenState extends State<RoofDurationScreen> {
           ),
           IconButton(
             onPressed: () => value > 1 ? onChanged(value - 1) : null,
-            icon: const Icon(Icons.remove_circle_outline, color: AppColors.error),
+            icon: const Icon(
+              Icons.remove_circle_outline,
+              color: AppColors.error,
+            ),
           ),
           Text(
             '$value',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           IconButton(
             onPressed: () => onChanged(value + 1),
-            icon: const Icon(Icons.add_circle_outline, color: AppColors.success),
+            icon: const Icon(
+              Icons.add_circle_outline,
+              color: AppColors.success,
+            ),
           ),
         ],
       ),
     );
   }
 }
-
-
