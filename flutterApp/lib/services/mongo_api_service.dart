@@ -155,24 +155,15 @@ class MongoApiService {
 
     if (res.statusCode >= 200 && res.statusCode < 300) {
       if (decoded is Map<String, dynamic>) return decoded;
-      // Safety: some endpoints could return non-map JSON
       if (decoded != null) return {'data': decoded};
-      return {
-        'data': res.body,
-      };
+      return {'data': res.body};
     }
 
     if (decoded is Map && decoded['error'] != null) {
       throw Exception(decoded['error']);
     }
 
-    final preview = res.body.replaceAll(RegExp(r'\s+'), ' ').trim();
-    final snippet = preview.length > 120 ? '${preview.substring(0, 120)}...' : preview;
-
-    throw Exception(
-      'HTTP ${res.statusCode}: non-JSON response from ${res.request?.url}. '
-      'Check AppConfig.baseUrl/port. Response: $snippet',
-    );
+    throw Exception(_unexpectedResponseMessage(res));
   }
 
   dynamic _tryDecodeJson(String body) {
@@ -180,18 +171,6 @@ class MongoApiService {
       return jsonDecode(body);
     } catch (_) {
       return null;
-    }
-  }
-
-  Map<String, dynamic> _parse(http.Response res) {
-    try {
-      final body = jsonDecode(res.body);
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        return body as Map<String, dynamic>;
-      }
-      throw Exception((body as Map)['error'] ?? 'HTTP ${res.statusCode}');
-    } on FormatException {
-      throw Exception(_unexpectedResponseMessage(res));
     }
   }
 
@@ -245,10 +224,13 @@ class MongoApiService {
 
   Future<Map<String, dynamic>> getProject(String pid) => get('/projects/$pid');
 
-  Future<void> updateProject(String pid, Map<String, dynamic> data) =>
-      put('/projects/$pid', data);
+  Future<void> updateProject(String pid, Map<String, dynamic> data) async {
+    await put('/projects/$pid', data);
+  }
 
-  Future<void> deleteProject(String pid) => delete('/projects/$pid');
+  Future<void> deleteProject(String pid) async {
+    await delete('/projects/$pid');
+  }
 
   Future<Map<String, dynamic>> postBuildingStructure(
           String pid, Map<String, dynamic> structureData) =>
@@ -284,11 +266,18 @@ class MongoApiService {
   Future<Map<String, dynamic>> addSub(String pid, String sub, Map<String, dynamic> data) =>
       post('/projects/$pid/$sub', data);
 
-  Future<void> updateSub(String pid, String sub, String docId, Map<String, dynamic> data) =>
-      put('/projects/$pid/$sub/$docId', data);
+  Future<void> updateSub(
+    String pid,
+    String sub,
+    String docId,
+    Map<String, dynamic> data,
+  ) async {
+    await put('/projects/$pid/$sub/$docId', data);
+  }
 
-  Future<void> deleteSub(String pid, String sub, String docId) =>
-      delete('/projects/$pid/$sub/$docId');
+  Future<void> deleteSub(String pid, String sub, String docId) async {
+    await delete('/projects/$pid/$sub/$docId');
+  }
 
   //######################### IT22574718 #######################################################
 
@@ -421,7 +410,7 @@ class MongoApiService {
   }
 
   //######################### IT22574718#######################################################
-}
+
   // ─── ThreeJS endpoints ─────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getThreeJs(String pid) => get('/threejs/$pid');
 
@@ -430,33 +419,43 @@ class MongoApiService {
     return res['html_code'] as String?;
   }
 
-  Future<void> setThreeJsCategory(String pid, String category, String htmlCode) =>
-      post('/threejs/$pid/$category', {'html_code': htmlCode});
+  Future<void> setThreeJsCategory(
+    String pid,
+    String category,
+    String htmlCode,
+  ) async {
+    await post('/threejs/$pid/$category', {'html_code': htmlCode});
+  }
 
   // ─── Materials library ─────────────────────────────────────────────────────
-
-  /// All materials sorted by name. Returns List of {_id, name, brands, sizes}.
   Future<List<dynamic>> getAllMaterials() => getList('/materials');
 
-  /// Create a material. Returns the created doc.
   Future<Map<String, dynamic>> createMaterial(
-      String name, List<String> brands, List<String> sizes) =>
-      post('/materials', {'name': name, 'brands': brands, 'sizes': sizes});
+    String name,
+    List<String> brands,
+    List<String> sizes,
+  ) {
+    return post('/materials', {'name': name, 'brands': brands, 'sizes': sizes});
+  }
 
-  /// Update brands/sizes (and optionally name) for a material by id.
   Future<Map<String, dynamic>> updateMaterial(
-      String id, {String? name, List<String>? brands, List<String>? sizes}) {
+    String id, {
+    String? name,
+    List<String>? brands,
+    List<String>? sizes,
+  }) {
     final body = <String, dynamic>{};
-    if (name   != null) body['name']   = name;
+    if (name != null) body['name'] = name;
     if (brands != null) body['brands'] = brands;
-    if (sizes  != null) body['sizes']  = sizes;
+    if (sizes != null) body['sizes'] = sizes;
     return put('/materials/$id', body);
   }
 
-  /// Delete a material by id.
-  Future<void> deleteMaterial(String id) => delete('/materials/$id');
+  Future<void> deleteMaterial(String id) async {
+    await delete('/materials/$id');
+  }
 
-  /// Brands + sizes for a material name (used by _MatRow select buttons).
-  Future<Map<String, dynamic>> getMaterialOptions(String materialName) =>
-      get('/materials/options/${Uri.encodeComponent(materialName)}');
+  Future<Map<String, dynamic>> getMaterialOptions(String materialName) {
+    return get('/materials/options/${Uri.encodeComponent(materialName)}');
+  }
 }
