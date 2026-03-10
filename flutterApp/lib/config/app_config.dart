@@ -8,7 +8,12 @@ class AppConfig {
 
   /// PC's local WiFi IP — Android device must be on the same network.
   static const String backendHost = '192.168.8.103';
+  // Core Mongo backend (auth/projects/subcollections).
   static const int    backendPort = 8090;
 
+  // IT22574718 backend module (ML + phase progress tracking).
+  static const int    itBackendPort = 8091;
+
   static String get baseUrl => 'http://$backendHost:$backendPort';
+  static String get itBaseUrl => 'http://$backendHost:$itBackendPort';
 }
