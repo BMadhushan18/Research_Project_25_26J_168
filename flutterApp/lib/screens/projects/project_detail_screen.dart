@@ -21,6 +21,8 @@ class ProjectDetailScreen extends StatefulWidget {
 class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
+  String? _materialRoomLabel;
+  Map<String, dynamic>? _materialRoomData;
 
   final _tabItems = const [
     _TabItem(Icons.dashboard_outlined, 'Overview'),
@@ -93,14 +95,29 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
               controller: _tabs,
-              children: const [
-                OverviewTab(),
-                MaterialsTab(),
-                WorkersTab(),
-                BOQTab(),
-                PurchasingTab(),
-                ProgressTab(),
-                SafetyTab(),
+              children: [
+                OverviewTab(
+                  onNavigateToTab: (index,
+                      {String? roomLabel,
+                      Map<String, dynamic>? roomData}) {
+                    if (index == 1) {
+                      setState(() {
+                        _materialRoomLabel = roomLabel;
+                        _materialRoomData  = roomData;
+                      });
+                    }
+                    _tabs.animateTo(index);
+                  },
+                ),
+                MaterialsTab(
+                  roomLabel: _materialRoomLabel,
+                  roomData:  _materialRoomData,
+                ),
+                const WorkersTab(),
+                const BOQTab(),
+                const PurchasingTab(),
+                const ProgressTab(),
+                const SafetyTab(),
               ],
             ),
     );

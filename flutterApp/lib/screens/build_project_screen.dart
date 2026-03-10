@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import '../utils/constants.dart';
+import '../config/app_config.dart' as config;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -150,6 +151,38 @@ class _BuildProjectScreenState extends State<BuildProjectScreen> {
 
   // ── Send to Gemini ────────────────────────────────────────────────────────
 
+  /// Gets edge map from contour detection API for a given image bytes
+  Future<String?> _getEdgeMap(Uint8List imageBytes, String filename) async {
+    try {
+      final uri = Uri.parse('${config.AppConfig.baseUrl}/contour/detect');
+      final request = http.MultipartRequest('POST', uri)
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'image',
+            imageBytes,
+            filename: filename,
+          ),
+        );
+
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 30),
+      );
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        if (data['success'] == true && data['edge_map'] != null) {
+          return data['edge_map'] as String; // base64 encoded edge map
+        }
+      }
+      // If contour detection fails, return null to fall back to original image
+      return null;
+    } catch (e) {
+      // If contour detection fails, return null to fall back to original image
+      return null;
+    }
+  }
+
   String _mimeFor(String name) {
     final ext = name.split('.').last.toLowerCase();
     const map = {
@@ -188,15 +221,20 @@ class _BuildProjectScreenState extends State<BuildProjectScreen> {
     });
 
     try {
-      // Build parts — files first, then the prompt text
+      // Build parts — process each image through contour detection first
       final List<Map<String, dynamic>> parts = [];
 
       for (final f in _files) {
         if (f.bytes == null) continue;
+
+        // Try to get edge map from contour detection
+        final edgeMapB64 = await _getEdgeMap(f.bytes!, f.name);
+        final imageData = edgeMapB64 ?? base64Encode(f.bytes!); // fallback to original if contour fails
+
         parts.add({
           'inline_data': {
-            'mime_type': _mimeFor(f.name),
-            'data': base64Encode(f.bytes!),
+            'mime_type': 'image/jpeg', // edge maps are always JPEG
+            'data': imageData,
           },
         });
       }
