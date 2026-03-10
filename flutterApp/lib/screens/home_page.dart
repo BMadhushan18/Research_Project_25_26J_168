@@ -7,8 +7,8 @@ import 'login_screen.dart';
 import 'material_estimate_screen.dart';
 import 'wood_detection_screen.dart';
 import 'cost_estimation_screen.dart';
-import 'machine_management_screen.dart';
 import 'time_estimation/time_estimate_screen.dart';
+import 'machine_management_screen.dart';
 import 'create_project_flow.dart';
 import 'projects/projects_screen.dart';
 import 'build_project_screen.dart';
@@ -292,18 +292,27 @@ class _HomePageState extends State<HomePage>
                   ),
                 );
               }).toList(),
-              onChanged: (ProjectModel? newValue) {
-                if (newValue != null) {
-                  provider.selectProject(newValue.projectId);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                          'Switched to ${newValue.projectName} workspace.'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
+              onChanged: (ProjectModel? newValue) async {
+                if (newValue == null) return;
+
+                final provider = context.read<MongoProjectProvider>();
+
+                // Selected project id
+                final String pid = newValue.projectId;
+
+                // Set active project in provider
+                await provider.selectProject(pid);
+
+                // Now pid is stored in provider.currentProject
+                print("Selected PID = $pid");
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Switched to ${newValue.projectName} workspace.'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: Colors.green,
+                  ),
+                );
               },
             ),
           ),
@@ -420,6 +429,18 @@ class _HomePageState extends State<HomePage>
           ),
         ),
         _buildFeatureCard(
+          icon: Icons.calculate_rounded,
+          title: 'Time Estimate',
+          description: 'Project Schedule Analysis',
+          color: AppColors.success,
+          backgroundImage: 'AppImages/time_estimate.png',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const TimeEstimateScreen()),
+          ),
+        ),
+        _buildFeatureCard(
           icon: Icons.precision_manufacturing_rounded,
           title: 'Smart Logistics',
           description: 'Equipment management',
@@ -441,18 +462,6 @@ class _HomePageState extends State<HomePage>
             context,
             MaterialPageRoute(
                 builder: (context) => const MaterialEstimateScreen()),
-          ),
-        ),
-        _buildFeatureCard(
-          icon: Icons.calculate_rounded,
-          title: 'Time Estimate',
-          description: 'DurationAnalysis',
-          color: AppColors.success,
-          backgroundImage: 'AppImages/material_estimate.png',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const TimeEstimateScreen()),
           ),
         ),
       ],
