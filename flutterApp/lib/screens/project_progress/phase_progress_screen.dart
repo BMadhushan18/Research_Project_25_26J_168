@@ -6,6 +6,7 @@ import 'track_progress_screen.dart';
 import 'phase_daily_log_screen.dart';
 import 'skip_daily_work_screen.dart';
 import 'recent_daily_logs_screen.dart';
+import 'phase_logs_calendar_screen.dart';
 
 class PhaseDailyLogScreen extends StatefulWidget {
   final String pid;
@@ -61,7 +62,6 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
     final phaseChanged =
         oldWidget.pid != widget.pid || oldWidget.phaseId != widget.phaseId;
     if (phaseChanged) {
-      // Prevent previous phase values from leaking into a newly opened phase.
       setState(() {
         startDate = null;
         updateDate = null;
@@ -108,6 +108,244 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
     return int.tryParse('${value ?? ''}') ?? fallback;
   }
 
+  void _showCompletionSummary(Map<String, dynamic> phaseData) {
+    final DateTime? plannedEndDate = _parseDate(
+      phaseData['initialEstimatedEndDate'] ?? phaseData['updatedEstimatedEndDate'],
+    );
+    final DateTime? actualEndDate = _parseDate(phaseData['actualCompletedDate']);
+
+    if (plannedEndDate == null || actualEndDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot calculate completion summary')),
+      );
+      return;
+    }
+
+    final int daysDifference = actualEndDate.difference(plannedEndDate).inDays;
+    final bool isEarly = daysDifference < 0;
+    final bool isOnTime = daysDifference == 0;
+    final bool isDelayed = daysDifference > 0;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icon at top
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDelayed
+                        ? AppColors.error.withOpacity(0.12)
+                        : AppColors.success.withOpacity(0.12),
+                  ),
+                  child: Icon(
+                    isDelayed ? Icons.warning_rounded : Icons.celebration_rounded,
+                    size: 40,
+                    color: isDelayed ? AppColors.error : AppColors.success,
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Title
+                const Text(
+                  'Summary of The Phase',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Main message
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDelayed
+                        ? AppColors.error.withOpacity(0.08)
+                        : AppColors.success.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDelayed
+                          ? AppColors.error.withOpacity(0.25)
+                          : AppColors.success.withOpacity(0.25),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        isOnTime
+                            ? 'You completed the phase on time\nas planned'
+                            : isEarly
+                                ? 'You saved ${daysDifference.abs()} day${daysDifference.abs() == 1 ? '' : 's'}\nin this phase'
+                                : 'You delayed ${daysDifference.abs()} day${daysDifference.abs() == 1 ? '' : 's'}\nin this phase',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: isDelayed ? AppColors.error : AppColors.success,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Dates info
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.event_available_rounded,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Planned End Date',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  formatDate(plannedEndDate),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.check_circle_outline_rounded,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Actual End Date',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  formatDate(actualEndDate),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Close button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.pop(context, true);
+                      } else {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TrackProgressScreen(
+                              pid: widget.pid,
+                              projectName: widget.projectName,
+                              location: widget.projectLocation,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   double _asDouble(dynamic value, double fallback) {
     if (value is double) return value;
     if (value is num) return value.toDouble();
@@ -139,7 +377,9 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
     if (s == 'completed') return 'Completed';
     if (s == 'delayed') return 'Delayed';
     if (s == 'in progress' || s == 'in_progress') return 'In Progress';
-    if (s == 'pending' || s == 'not started' || s == 'not_started') return 'Not Started';
+    if (s == 'pending' || s == 'not started' || s == 'not_started') {
+      return 'Not Started';
+    }
     if (s.isEmpty) return 'Not Started';
     return status;
   }
@@ -255,7 +495,6 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
         'startDate': DateFormat('yyyy-MM-dd').format(normalizedDate),
       });
 
-      // Reload summary values from backend so UI stays in sync.
       await _loadPhaseDurationContext();
 
       if (!mounted) return;
@@ -321,8 +560,10 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
     final DateTime minDate = _dateOnly(startDate!);
     final DateTime today = _dateOnly(DateTime.now());
     final DateTime currentInitial = _dateOnly(updateDate ?? today);
-    final DateTime boundedInitial = currentInitial.isBefore(minDate) ? minDate : currentInitial;
-    final DateTime initialDate = boundedInitial.isAfter(today) ? today : boundedInitial;
+    final DateTime boundedInitial =
+        currentInitial.isBefore(minDate) ? minDate : currentInitial;
+    final DateTime initialDate =
+        boundedInitial.isAfter(today) ? today : boundedInitial;
 
     if (minDate.isAfter(today)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -343,6 +584,30 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
         updateDate = picked;
       });
     }
+  }
+
+  Future<DateTime?> _pickCompletionDate() async {
+    final DateTime today = _dateOnly(DateTime.now());
+    final DateTime minDate = startDate != null ? _dateOnly(startDate!) : DateTime(2024);
+    final DateTime seedDate = updateDate != null ? _dateOnly(updateDate!) : today;
+    final DateTime initialDate = seedDate.isAfter(today)
+        ? today
+        : (seedDate.isBefore(minDate) ? minDate : seedDate);
+
+    if (minDate.isAfter(today)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completion date cannot be before start date.')),
+      );
+      return null;
+    }
+
+    return showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: minDate,
+      lastDate: today,
+      helpText: 'Select Actual Completion Date',
+    );
   }
 
   Future<void> _continueDailyFlow() async {
@@ -370,6 +635,7 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
     final DateTime start = _dateOnly(startDate!);
     final DateTime log = _dateOnly(updateDate!);
     final DateTime today = _dateOnly(DateTime.now());
+
     if (log.isBefore(start)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -530,6 +796,19 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
     );
   }
 
+  void _openCalendarView() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhaseLogsCalendarScreen(
+          pid: widget.pid,
+          phaseId: widget.phaseId,
+          phaseName: widget.phaseName,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final progress = progressPercent.clamp(0, 100).toDouble();
@@ -559,6 +838,8 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
           ],
           const SizedBox(height: 16),
           _buildViewLogsButton(),
+          const SizedBox(height: 16),
+          _buildViewCalendarButton(),
           const SizedBox(height: 16),
           _buildCompleteButton(),
         ],
@@ -624,7 +905,10 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: chipColor.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
@@ -784,7 +1068,10 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
                   onTap: _pickStartDate,
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(14),
@@ -1014,6 +1301,47 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
     );
   }
 
+  Widget _buildViewCalendarButton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: ElevatedButton.icon(
+          onPressed: _openCalendarView,
+          icon: const Icon(Icons.calendar_month_rounded),
+          label: const Text(
+            'View Calendar',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.secondary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCompleteButton() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1036,34 +1364,45 @@ class _PhaseDailyLogScreenState extends State<PhaseDailyLogScreen> {
           onPressed: (_isCompletingPhase || _isCompleted)
               ? null
               : () async {
+                  final pickedCompletionDate = await _pickCompletionDate();
+                  if (pickedCompletionDate == null) return;
+
                   setState(() => _isCompletingPhase = true);
                   try {
                     await _api.loadToken();
-                    final todayIso = DateFormat('yyyy-MM-dd').format(DateTime.now());
-                    await _api.completePhaseDuration(
+                    final completionIso = DateFormat('yyyy-MM-dd').format(
+                      _dateOnly(pickedCompletionDate),
+                    );
+                    final res = await _api.completePhaseDuration(
                       pid: widget.pid,
                       phaseId: widget.phaseId,
-                      actualCompletedDate: todayIso,
+                      actualCompletedDate: completionIso,
                     );
 
                     if (!mounted) return;
 
-                    await _loadPhaseDurationContext();
-
-                    if (!mounted) return;
-                    if (Navigator.of(context).canPop()) {
-                      Navigator.pop(context, true);
+                    // Get phaseDuration from response
+                    final phaseDurationData = res['phaseDuration'];
+                    if (phaseDurationData is Map<String, dynamic>) {
+                      _showCompletionSummary(phaseDurationData);
                     } else {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => TrackProgressScreen(
-                            pid: widget.pid,
-                            projectName: widget.projectName,
-                            location: widget.projectLocation,
+                      // Fallback: reload and navigate
+                      await _loadPhaseDurationContext();
+                      if (!mounted) return;
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.pop(context, true);
+                      } else {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TrackProgressScreen(
+                              pid: widget.pid,
+                              projectName: widget.projectName,
+                              location: widget.projectLocation,
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      }
                     }
                   } catch (e) {
                     if (!mounted) return;

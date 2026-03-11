@@ -10,6 +10,7 @@ import 'tabs/boq_tab.dart';
 import 'tabs/purchasing_tab.dart';
 import 'tabs/progress_tab.dart';
 import 'tabs/safety_tab.dart';
+import '../../screens/cost_estimate/total_cost_estimate_screen.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
   const ProjectDetailScreen({super.key});
@@ -25,11 +26,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   final _tabItems = const [
     _TabItem(Icons.dashboard_outlined, 'Overview'),
     _TabItem(Icons.inventory_2_outlined, 'Materials'),
+    _TabItem(Icons.calculate, 'Cost Estimate'),
     _TabItem(Icons.people_outline, 'Workers'),
     _TabItem(Icons.format_list_numbered, 'BOQ'),
     _TabItem(Icons.shopping_cart_outlined, 'Purchasing'),
     _TabItem(Icons.bar_chart_outlined, 'Progress'),
     _TabItem(Icons.health_and_safety_outlined, 'Safety'),
+    
   ];
 
   @override
@@ -96,6 +99,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               children: const [
                 OverviewTab(),
                 MaterialsTab(),
+                TotalCostEstimateScreen(),
                 WorkersTab(),
                 BOQTab(),
                 PurchasingTab(),
