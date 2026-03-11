@@ -38,6 +38,8 @@ class PhaseWiseDurationScreen extends StatefulWidget {
 class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
   //  API instance
   final MongoApiService _api = MongoApiService();
+  int? _estimatedTotalDurationDays;
+  bool _loadingEstimatedTotalDuration = true;
 
   //  Per-item saving state (disable only that Save button)
   final Set<int> _saving = <int>{};
@@ -67,10 +69,31 @@ class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
     try {
       await context.read<MongoProjectProvider>().ensureCurrentProject(widget.pid);
       await _api.loadToken(); // ensure token loaded
-      await _loadSavedPhaseDurations();
-      await _loadPhaseLocks();
     } catch (_) {
-      // If token missing or backend unreachable, screen still works locally
+      // If token missing or backend unreachable, continue with best-effort UI loading.
+    }
+
+    await _loadEstimatedTotalDuration();
+    await _loadSavedPhaseDurations();
+    await _loadPhaseLocks();
+  }
+
+  Future<void> _loadEstimatedTotalDuration() async {
+    try {
+      final project = await _api.getProject(widget.pid);
+      final days = _toInt(project['estimatedTotalDuration']);
+
+      if (!mounted) return;
+      setState(() {
+        _estimatedTotalDurationDays = days > 0 ? days : null;
+        _loadingEstimatedTotalDuration = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _estimatedTotalDurationDays = null;
+        _loadingEstimatedTotalDuration = false;
+      });
     }
   }
 
@@ -186,9 +209,10 @@ class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
       body: Column(
         children: [
           _buildHeader(),
+          _buildEstimatedTotalDurationCard(),
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 110), // increased bottom padding for nav bar
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 110), // increased bottom padding for nav bar
               itemCount: _phases.length,
               separatorBuilder: (_, __) => const SizedBox(height: 14),
               itemBuilder: (context, index) {
@@ -274,6 +298,78 @@ class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEstimatedTotalDurationCard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderLight),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.cardShadow,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.schedule_rounded,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Estimated Total Duration',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (_loadingEstimatedTotalDuration)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    Text(
+                      _estimatedTotalDurationDays == null
+                          ? 'Not available'
+                          : '$_estimatedTotalDurationDays day${_estimatedTotalDurationDays == 1 ? '' : 's'}',
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

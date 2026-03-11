@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../utils/constants.dart';
 import '../../services/mongo_api_service.dart';
+import '../../providers/mongo_project_provider.dart';
 import 'estimation_result_screen.dart';
 
 class TimeEstimateScreen extends StatefulWidget {
@@ -64,6 +66,18 @@ class _TimeEstimateScreenState extends State<TimeEstimateScreen> {
     // Stop early if any form field fails validation.
     if (!_formKey.currentState!.validate()) return;
 
+    final pid = context.read<MongoProjectProvider>().currentProject?.projectId;
+    if (pid == null || pid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a project first'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     final area = double.parse(_areaController.text.trim());
 
     setState(() => _isLoading = true);
@@ -87,6 +101,11 @@ class _TimeEstimateScreenState extends State<TimeEstimateScreen> {
   // Backend may return int or num; normalize to integer days for UI and next screen.
       final raw = res["duration_days"];
       final durationDays = (raw is int) ? raw : (raw as num).round();
+
+      // Persist total duration days in the selected project's root document.
+      await _api.updateProject(pid, {
+        'estimatedTotalDuration': durationDays,
+      });
 
   // Build a readable duration label shown in the result screen.
       final durationText = _formatDurationFromDays(durationDays);
