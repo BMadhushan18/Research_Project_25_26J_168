@@ -51,7 +51,7 @@ class MongoApiService {
     return _parse(res);
   }
 
-  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> post(String path,Map<String, dynamic> body,) async {
     await _ensureToken();
     final res = await http
         .post(
@@ -63,7 +63,7 @@ class MongoApiService {
     return _parse(res);
   }
 
-  Future<Map<String, dynamic>> postAbsolute(String absoluteUrl, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> postAbsolute(String absoluteUrl,Map<String, dynamic> body,) async {
     await _ensureToken();
     final res = await http
         .post(
@@ -91,7 +91,8 @@ class MongoApiService {
     }
 
     final preview = res.body.replaceAll(RegExp(r'\s+'), ' ').trim();
-    final snippet = preview.length > 120 ? '${preview.substring(0, 120)}...' : preview;
+    final snippet =
+        preview.length > 120 ? '${preview.substring(0, 120)}...' : preview;
     throw Exception(
       'HTTP ${res.statusCode}: non-JSON response from ${res.request?.url}. '
       'Check AppConfig base URLs/ports. Response: $snippet',
@@ -106,7 +107,10 @@ class MongoApiService {
     return _parse(res);
   }
 
-  Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>> put(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
     await _ensureToken();
     final res = await http
         .put(
@@ -145,7 +149,6 @@ class MongoApiService {
 
     if (res.statusCode >= 200 && res.statusCode < 300) {
       if (decoded is Map<String, dynamic>) return decoded;
-      // Safety: some endpoints could return non-map JSON
       if (decoded != null) return {'data': decoded};
       return {
         'data': res.body,
@@ -157,7 +160,8 @@ class MongoApiService {
     }
 
     final preview = res.body.replaceAll(RegExp(r'\s+'), ' ').trim();
-    final snippet = preview.length > 120 ? '${preview.substring(0, 120)}...' : preview;
+    final snippet =
+        preview.length > 120 ? '${preview.substring(0, 120)}...' : preview;
 
     throw Exception(
       'HTTP ${res.statusCode}: non-JSON response from ${res.request?.url}. '
@@ -189,7 +193,10 @@ class MongoApiService {
   }
 
   Future<Map<String, dynamic>> signin(String email, String password) async {
-    final res = await post('/auth/signin', {'email': email, 'password': password});
+    final res = await post('/auth/signin', {
+      'email': email,
+      'password': password,
+    });
     await saveToken(res['token'] as String);
     return res['user'] as Map<String, dynamic>;
   }
@@ -221,12 +228,22 @@ class MongoApiService {
   Future<void> deleteProject(String pid) => delete('/projects/$pid');
 
   // ─── Subcollection endpoints ───────────────────────────────────────────────
-  Future<List<dynamic>> getSub(String pid, String sub) => getList('/projects/$pid/$sub');
+  Future<List<dynamic>> getSub(String pid, String sub) =>
+      getList('/projects/$pid/$sub');
 
-  Future<Map<String, dynamic>> addSub(String pid, String sub, Map<String, dynamic> data) =>
+  Future<Map<String, dynamic>> addSub(
+    String pid,
+    String sub,
+    Map<String, dynamic> data,
+  ) =>
       post('/projects/$pid/$sub', data);
 
-  Future<void> updateSub(String pid, String sub, String docId, Map<String, dynamic> data) =>
+  Future<void> updateSub(
+    String pid,
+    String sub,
+    String docId,
+    Map<String, dynamic> data,
+  ) =>
       put('/projects/$pid/$sub/$docId', data);
 
   Future<void> deleteSub(String pid, String sub, String docId) =>
@@ -234,50 +251,55 @@ class MongoApiService {
 
   //######################### IT22574718 #######################################################
 
-
-  // ─── Duration Prediction endpoints ────────────────────────────────────────────────
+  // ─── Duration Prediction endpoints ─────────────────────────────────────────
 
   Future<Map<String, dynamic>> predictDuration(Map<String, dynamic> payload) {
     return postAbsolute(_itUrl('/ml/predict-duration'), payload);
   }
 
-  // Foundation phase prediction endpoint
-  Future<Map<String, dynamic>> predictFoundationDuration(Map<String, dynamic> payload) {
+  Future<Map<String, dynamic>> predictFoundationDuration(
+    Map<String, dynamic> payload,
+  ) {
     return postAbsolute(_itUrl('/ml/predict-foundation'), payload);
   }
 
-  // Structural wall phase prediction endpoint
-  Future<Map<String, dynamic>> predictWallDuration(Map<String, dynamic> payload) {
+  Future<Map<String, dynamic>> predictWallDuration(
+    Map<String, dynamic> payload,
+  ) {
     return postAbsolute(_itUrl('/ml/predict-wall'), payload);
   }
 
-  // Roofing phase prediction endpoint
-  Future<Map<String, dynamic>> predictRoofDuration(Map<String, dynamic> payload) {
+  Future<Map<String, dynamic>> predictRoofDuration(
+    Map<String, dynamic> payload,
+  ) {
     return postAbsolute(_itUrl('/ml/predict-roof'), payload);
   }
 
-  // Door and window fixture phase prediction endpoint
-  Future<Map<String, dynamic>> predictDoorWindowDuration(Map<String, dynamic> payload) {
+  Future<Map<String, dynamic>> predictDoorWindowDuration(
+    Map<String, dynamic> payload,
+  ) {
     return postAbsolute(_itUrl('/ml/predict-door-window'), payload);
   }
 
-  // Plastering phase prediction endpoint
-  Future<Map<String, dynamic>> predictPlasteringDuration(Map<String, dynamic> payload) {
+  Future<Map<String, dynamic>> predictPlasteringDuration(
+    Map<String, dynamic> payload,
+  ) {
     return postAbsolute(_itUrl('/ml/predict-plastering'), payload);
   }
 
-  // Flooring phase prediction endpoint
-  Future<Map<String, dynamic>> predictFlooringDuration(Map<String, dynamic> payload) {
+  Future<Map<String, dynamic>> predictFlooringDuration(
+    Map<String, dynamic> payload,
+  ) {
     return postAbsolute(_itUrl('/ml/predict-flooring'), payload);
   }
 
-  // Painting and finishing phase prediction endpoint
-  Future<Map<String, dynamic>> predictPaintingDuration(Map<String, dynamic> payload) {
+  Future<Map<String, dynamic>> predictPaintingDuration(
+    Map<String, dynamic> payload,
+  ) {
     return postAbsolute(_itUrl('/ml/predict-painting'), payload);
   }
 
-  /// Save a phase duration row: uid (from token) + pid + phaseId + phaseName + durationDays + laborCount
-  // Keep this (named params) to avoid breaking existing code.
+  /// Save a phase duration row
   Future<Map<String, dynamic>> savePhaseDuration({
     required String pid,
     required String phaseId,
@@ -294,11 +316,15 @@ class MongoApiService {
     });
   }
 
-  Future<Map<String, dynamic>> savePhaseDurationPayload(Map<String, dynamic> payload) {
+  Future<Map<String, dynamic>> savePhaseDurationPayload(
+    Map<String, dynamic> payload,
+  ) {
     return postAbsolute(_itUrl('/phase-durations/save'), payload);
   }
 
-  Future<Map<String, dynamic>> savePhaseDailyLogPayload(Map<String, dynamic> payload) {
+  Future<Map<String, dynamic>> savePhaseDailyLogPayload(
+    Map<String, dynamic> payload,
+  ) {
     return postAbsolute(_itUrl('/phase-daily-logs/save'), payload);
   }
 
@@ -308,11 +334,27 @@ class MongoApiService {
     int limit = 7,
   }) {
     final normalizedLimit = limit < 1 ? 1 : limit;
-    return getListAbsolute(_itUrl('/phase-daily-logs/recent/$pid/$phaseId?limit=$normalizedLimit'));
+    return getListAbsolute(
+      _itUrl('/phase-daily-logs/recent/$pid/$phaseId?limit=$normalizedLimit'),
+    );
+  }
+
+  /// For calendar view - get more logs
+  Future<List<dynamic>> getPhaseDailyLogs(
+    String pid,
+    String phaseId, {
+    int limit = 365,
+  }) {
+    final normalizedLimit = limit < 1 ? 1 : limit;
+    return getListAbsolute(
+      _itUrl('/phase-daily-logs/recent/$pid/$phaseId?limit=$normalizedLimit'),
+    );
   }
 
   Future<int> getCompletedPhaseDays(String pid, String phaseId) async {
-    final res = await getAbsolute(_itUrl('/phase-daily-logs/completed-days/$pid/$phaseId'));
+    final res = await getAbsolute(
+      _itUrl('/phase-daily-logs/completed-days/$pid/$phaseId'),
+    );
     final value = res['completedDays'];
     if (value is int) return value;
     if (value is num) return value.toInt();
@@ -357,9 +399,30 @@ class MongoApiService {
     });
   }
 
-  // Get all phase durations for a project
   Future<List<dynamic>> getPhaseDurations(String pid) {
     return getListAbsolute(_itUrl('/phase-durations/$pid'));
+  }
+
+  Future<double> getBoqReportGrandTotal(String pid) async {
+    final res = await getAbsolute(_itUrl('/boq-report/grand-total/$pid'));
+    final value = res['grandTotal'];
+    if (value is num) return value.toDouble();
+    return double.tryParse('${value ?? ''}') ?? 0.0;
+  }
+
+  Future<Map<String, double>> getBoqPredictionCosts(String pid) async {
+    final res = await getAbsolute(_itUrl('/boq-predictions/costs/$pid'));
+
+    double toDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      return double.tryParse('${value ?? ''}') ?? 0.0;
+    }
+
+    return {
+      'labor_cost_lkr': toDouble(res['labor_cost_lkr']),
+      'machinery_cost_lkr': toDouble(res['machinery_cost_lkr']),
+      'vehicle_cost_lkr': toDouble(res['vehicle_cost_lkr']),
+    };
   }
 
   //######################### IT22574718#######################################################
