@@ -12,15 +12,15 @@ import 'plastering_duration_screen.dart';
 import 'flooring_duration_screen.dart';
 import 'painting_finishing_duration_screen.dart';
 import 'phase_result.dart';
-import '../main_shell.dart';
+// import '../main_shell.dart';
 
 // backend client (file path is lib/service/mongo_api_service.dart)
 import '../../services/mongo_api_service.dart';
 
 // Additional imports for bottom nav
-import '../home_page.dart';
-import '../view_3d_screen.dart';
-import '../project_search_screen.dart';
+// import '../home_page.dart';
+// import '../view_3d_screen.dart';
+// import '../project_search_screen.dart';
 
 class PhaseWiseDurationScreen extends StatefulWidget {
   /// project id (pid) needed to save/load phase durations per project
@@ -38,8 +38,6 @@ class PhaseWiseDurationScreen extends StatefulWidget {
 class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
   //  API instance
   final MongoApiService _api = MongoApiService();
-  int? _estimatedTotalDurationDays;
-  bool _loadingEstimatedTotalDuration = true;
 
   //  Per-item saving state (disable only that Save button)
   final Set<int> _saving = <int>{};
@@ -59,6 +57,10 @@ class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
   late final List<_PhaseItem> _phases =
       _phaseMeta.map((m) => _PhaseItem(name: m.name)).toList();
 
+  int get _totalDurationDays {
+    return _phases.fold<int>(0, (sum, phase) => sum + phase.durationDays);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -73,28 +75,8 @@ class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
       // If token missing or backend unreachable, continue with best-effort UI loading.
     }
 
-    await _loadEstimatedTotalDuration();
     await _loadSavedPhaseDurations();
     await _loadPhaseLocks();
-  }
-
-  Future<void> _loadEstimatedTotalDuration() async {
-    try {
-      final project = await _api.getProject(widget.pid);
-      final days = _toInt(project['estimatedTotalDuration']);
-
-      if (!mounted) return;
-      setState(() {
-        _estimatedTotalDurationDays = days > 0 ? days : null;
-        _loadingEstimatedTotalDuration = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _estimatedTotalDurationDays = null;
-        _loadingEstimatedTotalDuration = false;
-      });
-    }
   }
 
   Future<void> _loadPhaseLocks() async {
@@ -233,36 +215,7 @@ class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _BottomNavBar(
-        currentPageIndex: 0, // not switching pages, so fixed
-        onItemTap: (barPos) {
-          if (barPos == 2) {
-            _openCamera();
-          } else {
-            final pageIndex = barPos < 2 ? barPos : barPos - 1;
-            final pages = [
-              const HomePage(),
-              const View3DScreen(),
-              const ProjectSearchScreen(),
-            ];
-            if (pageIndex == 3) {
-              // Open Progress inside MainShell so shared bottom nav is visible.
-              context.read<MongoProjectProvider>().selectProject(widget.pid);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const MainShell(initialIndex: 3),
-                ),
-              );
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => pages[pageIndex]),
-              );
-            }
-          }
-        },
-      ),
+  
     );
   }
 
@@ -340,7 +293,7 @@ class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Estimated Total Duration',
+                    'Total Duration',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
@@ -348,23 +301,16 @@ class _PhaseWiseDurationScreenState extends State<PhaseWiseDurationScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  if (_loadingEstimatedTotalDuration)
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    Text(
-                      _estimatedTotalDurationDays == null
-                          ? 'Not available'
-                          : '$_estimatedTotalDurationDays day${_estimatedTotalDurationDays == 1 ? '' : 's'}',
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  Text(
+                    _totalDurationDays == 0
+                        ? 'Not calculated yet'
+                        : '$_totalDurationDays day${_totalDurationDays == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
                     ),
+                  ),
                 ],
               ),
             ),
