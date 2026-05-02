@@ -55,7 +55,6 @@ class _TotalCostEstimateScreenState extends State<TotalCostEstimateScreen> {
   }
 
   Future<void> _prefetchCostsForTotal() async {
-    // Load both sources up-front so Total Cost is ready without tile clicks.
     await Future.wait([
       _fetchMaterialCost(),
       _fetchBoqPredictionCosts(),
@@ -188,7 +187,7 @@ class _TotalCostEstimateScreenState extends State<TotalCostEstimateScreen> {
       return '';
     }
     if (_materialCost != null) {
-      return 'Material Cost (LKR): Rs. ${_formatCurrency(_materialCost!)}';
+      return 'Material Cost (LKR): ${_formatCurrency(_materialCost!)}';
     }
     return '';
   }
@@ -223,12 +222,6 @@ class _TotalCostEstimateScreenState extends State<TotalCostEstimateScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _generateAndOpenPdf,
-        backgroundColor: AppColors.primary,
-        tooltip: 'Export PDF',
-        child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 26),
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
         child: Column(
@@ -240,6 +233,8 @@ class _TotalCostEstimateScreenState extends State<TotalCostEstimateScreen> {
             ),
             const SizedBox(height: 14),
             _buildTotalCostCard(),
+            const SizedBox(height: 16),
+            _buildPdfDownloadButton(),
             const SizedBox(height: 16),
 
             Row(
@@ -312,6 +307,32 @@ class _TotalCostEstimateScreenState extends State<TotalCostEstimateScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPdfDownloadButton() {
+    return Center(
+      child: SizedBox(
+        width: 280,
+        height: 56,
+        child: ElevatedButton.icon(
+          onPressed: _generateAndOpenPdf,
+          icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white),
+          label: const Text(
+            'Download PDF Report',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2E7D32),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         ),
       ),
     );
