@@ -251,12 +251,6 @@ class MongoApiService {
 
   //######################### IT22574718 #######################################################
 
-  // ─── Duration Prediction endpoints ─────────────────────────────────────────
-
-  Future<Map<String, dynamic>> predictDuration(Map<String, dynamic> payload) {
-    return postAbsolute(_itUrl('/ml/predict-duration'), payload);
-  }
-
   Future<Map<String, dynamic>> predictFoundationDuration(
     Map<String, dynamic> payload,
   ) {
@@ -419,9 +413,15 @@ class MongoApiService {
     }
 
     return {
-      'labor_cost_lkr': toDouble(res['labor_cost_lkr']),
-      'machinery_cost_lkr': toDouble(res['machinery_cost_lkr']),
-      'vehicle_cost_lkr': toDouble(res['vehicle_cost_lkr']),
+      'labor_cost_lkr': toDouble(
+        res['labor_cost_lkr'] ?? res['labour_cost_lkr'] ?? res['total_labour_cost_rs'],
+      ),
+      'machinery_cost_lkr': toDouble(
+        res['machinery_cost_lkr'] ?? res['total_machinery_cost_rs'],
+      ),
+      'vehicle_cost_lkr': toDouble(
+        res['vehicle_cost_lkr'] ?? res['total_vehicle_cost_rs'],
+      ),
     };
   }
 
