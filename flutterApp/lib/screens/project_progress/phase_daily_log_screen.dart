@@ -250,11 +250,11 @@ class _PhaseDailyUpdateScreenState extends State<PhaseDailyUpdateScreen> {
             items: const [
               DropdownMenuItem(
                 value: 'Full Day',
-                child: Text('Full Day (8 hours)'),
+                child: Text('Full Day'),
               ),
               DropdownMenuItem(
                 value: 'Half Day',
-                child: Text('Half Day (4 hours)'),
+                child: Text('Half Day'),
               ),
             ],
             onChanged: (value) {
@@ -264,43 +264,7 @@ class _PhaseDailyUpdateScreenState extends State<PhaseDailyUpdateScreen> {
               });
             },
           ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.primary.withOpacity(0.18)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.calculate_rounded, color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Today working hours per labor: $hoursPerLabor hrs',
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Preview Daily Man Hours: $previewDailyManHours',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
