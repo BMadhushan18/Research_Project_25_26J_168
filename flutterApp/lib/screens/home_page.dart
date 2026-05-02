@@ -6,12 +6,12 @@ import '../utils/constants.dart';
 import 'login_screen.dart';
 import 'material_estimate_screen.dart';
 import 'wood_detection_screen.dart';
-import 'cost_estimation_screen.dart';
-import 'time_estimation/time_estimate_screen.dart';
+import 'time_estimation/phase_wise_duration_screen.dart';
 import 'machine_management_screen.dart';
 import 'create_project_flow.dart';
 import 'projects/projects_screen.dart';
 import 'build_project_screen.dart';
+import 'project_progress/track_progress_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -417,16 +417,37 @@ class _HomePageState extends State<HomePage>
           ),
         ),
         _buildFeatureCard(
-          icon: Icons.attach_money_rounded,
-          title: 'Cost Estimation',
-          description: 'Project budget analysis',
+          icon: Icons.show_chart_rounded,
+          title: 'Project Progress',
+          description: 'Track project progress and phases',
           color: AppColors.success,
-          backgroundImage: 'AppImages/costEstimate.jpg',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const CostEstimationScreen()),
-          ),
+          backgroundImage: 'AppImages/progress.png',
+          onTap: () {
+            final provider = context.read<MongoProjectProvider>();
+            final pid = provider.currentProject?.projectId;
+
+            if (pid == null || pid.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please select a project first'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.error,
+                ),
+              );
+              return;
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TrackProgressScreen(
+                  pid: pid,
+                  projectName: provider.currentProject?.projectName,
+                  location: provider.currentProject?.location,
+                ),
+              ),
+            );
+          },
         ),
         _buildFeatureCard(
           icon: Icons.calculate_rounded,
@@ -434,11 +455,28 @@ class _HomePageState extends State<HomePage>
           description: 'Project Schedule Analysis',
           color: AppColors.success,
           backgroundImage: 'AppImages/time_estimate.png',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const TimeEstimateScreen()),
-          ),
+          onTap: () {
+            final pid =
+                context.read<MongoProjectProvider>().currentProject?.projectId;
+
+            if (pid == null || pid.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please select a project first'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.error,
+                ),
+              );
+              return;
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PhaseWiseDurationScreen(pid: pid),
+              ),
+            );
+          },
         ),
         _buildFeatureCard(
           icon: Icons.precision_manufacturing_rounded,
